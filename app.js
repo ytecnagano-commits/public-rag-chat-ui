@@ -1,4 +1,4 @@
-// ===== 設定（あとでWorkers URLに差し替え）=====
+// ===== 設定（Workers URL）=====
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
 // ===== 簡易ストレージ（ブラウザ内）=====
@@ -128,14 +128,22 @@ function addMessage(role, content) {
   renderAll();
 }
 
+/**
+ * API呼び出しの戻り値：
+ * { reply: string, sources: Array<{id?:string, title?:string, score?:number}> }
+ */
 async function callApi(userText) {
   // Workersがまだ無い間はダミー応答
   if (!API_URL) {
     await new Promise(r => setTimeout(r, 400));
-    return `（ダミー）受け取りました：\n${userText}\n\n次はWorkers APIに接続します。`;
+    return {
+      reply: `（ダミー）受け取りました：\n${userText}\n\n次はWorkers APIに接続します。`,
+      sources: []
+    };
   }
 
   const t = threads.find(x => x.id === activeId);
+
   const payload = {
     message: userText,
     thread_id: activeId,
@@ -147,12 +155,17 @@ async function callApi(userText) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
+
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`API error: ${res.status} ${txt}`);
   }
-  const data = await res.json();
-  return data.reply ?? data.message ?? JSON.stringify(data);
+
+  const data = await res.json().catch(() => ({}));
+  return {
+    reply: data.reply ?? data.message ?? "",
+    sources: Array.isArray(data.sources) ? data.sources : []
+  };
 }
 
 async function send() {
@@ -169,8 +182,25 @@ async function send() {
   const idx = t.messages.length - 1;
 
   try {
-    const reply = await callApi(text);
-    t.messages[idx].content = reply;
+    const result = await callApi(text); // { reply, sources }
+    const replyText = result?.reply ?? "";
+    const sources = Array.isArray(result?.sources) ? result.sources : [];
+
+    let appended = replyText;
+
+    // sources を回答末尾に追記（ChatGPTっぽく「参照」）
+    if (sources.length) {
+      const lines = sources.slice(0, 5).map((s, i) => {
+        const title = s.title || s.id || `source_${i + 1}`;
+        const score = (typeof s.score === "number")
+          ? ` (score ${s.score.toFixed(3)})`
+          : "";
+        return `- ${title}${score}`;
+      });
+      appended += `\n\n---\n参照（上位${Math.min(5, sources.length)}件）\n${lines.join("\n")}`;
+    }
+
+    t.messages[idx].content = appended;
     t.updatedAt = nowIso();
     saveThreads(threads);
     renderAll();
