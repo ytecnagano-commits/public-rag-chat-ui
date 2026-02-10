@@ -1,13 +1,9 @@
-"use strict";
-
-// ===== Workers URL =====
+// ===== Config =====
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
-// ===== LocalStorage =====
+// ===== Storage =====
 const LS_KEY = "public_rag_chat_threads_v1";
 const nowIso = () => new Date().toISOString();
-
-const $ = (sel) => document.querySelector(sel);
 
 function loadThreads() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
@@ -25,202 +21,115 @@ function newThread() {
     messages: []
   };
 }
-function pickTitleFromText(text) {
-  const t = (text || "").trim().replace(/\s+/g, " ");
-  return t.length > 24 ? t.slice(0, 24) + "…" : (t || "新しいチャット");
+
+let threads = loadThreads();
+if (!threads.length) {
+  threads = [newThread()];
+  saveThreads(threads);
+}
+let activeId = threads[0].id;
+
+// ===== DOM =====
+const chatEl = document.getElementById("chat");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("sendBtn");
+const newChatBtn = document.getElementById("newChatBtn");
+const clearBtn = document.getElementById("clearBtn");
+const threadListEl = document.getElementById("threadList");
+const threadTitleEl = document.getElementById("threadTitle");
+
+if (!chatEl || !inputEl || !sendBtn || !threadListEl || !threadTitleEl) {
+  console.error("Missing required DOM elements. Check element IDs in index.html.");
 }
 
-// ===== UI refs =====
-let threads = [];
-let activeId = null;
-
-const listEl = $("#threadList");
-const newBtn = $("#newThreadBtn");
-const titleEl = $("#threadTitle");
-const clearBtn = $("#clearThreadBtn");
-const chatEl = $("#chat");
-const inputEl = $("#input");
-const sendBtn = $("#sendBtn");
-
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function renderThreadList() {
-  if (!listEl) return;
-  listEl.innerHTML = "";
-  threads.forEach((t) => {
+// ===== Render =====
+function renderThreads() {
+  threadListEl.innerHTML = "";
+  const sorted = [...threads].sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1));
+  for (const t of sorted) {
     const div = document.createElement("div");
-    div.className = "threadItem" + (t.id === activeId ? " active" : "");
-    div.innerHTML = `
-      <div class="threadTitle">${escapeHtml(t.title)}</div>
-      <div class="threadMeta">${escapeHtml((t.messages?.length || 0) + " messages")}</div>
-    `;
-    div.addEventListener("click", () => {
-      activeId = t.id;
-      saveThreads(threads);
-      renderAll();
-    });
-    listEl.appendChild(div);
-  });
+    div.className = "thread" + (t.id === activeId ? " active" : "");
+    div.onclick = () => { activeId = t.id; renderAll(); };
+
+    const title = document.createElement("div");
+    title.className = "thread-title";
+    title.textContent = t.title || "チャット";
+
+    const meta = document.createElement("div");
+    meta.className = "thread-meta";
+    meta.textContent = `${t.messages.length} messages`;
+
+    div.appendChild(title);
+    div.appendChild(meta);
+    threadListEl.appendChild(div);
+  }
 }
 
 function renderChat() {
-  if (!chatEl) return;
   const t = threads.find(x => x.id === activeId);
-  if (!t) return;
-
-  titleEl && (titleEl.textContent = t.title);
+  threadTitleEl.textContent = t?.title || "チャット";
 
   chatEl.innerHTML = "";
-  for (const m of t.messages) {
-    const row = document.createElement("div");
-    row.className = "msgRow " + (m.role === "user" ? "user" : "assistant");
-    row.innerHTML = `
-      <div class="msgBubble">
-        <div class="msgText">${escapeHtml(m.content).replaceAll("\n", "<br>")}</div>
-        ${m.sources?.length ? `
-          <div class="msgSources">
-            <div class="srcHead">【参照】</div>
-            <ul>
-              ${m.sources.map(s =>
-                `<li>${escapeHtml(s.title || s.id)}（score ${Number(s.score ?? 0).toFixed(3)}）</li>`
-              ).join("")}
-            </ul>
-          </div>` : ""
-        }
-      </div>
-    `;
-    chatEl.appendChild(row);
+  for (const m of (t?.messages || [])) {
+    const bubble = document.createElement("div");
+    bubble.className = "msg " + (m.role === "user" ? "user" : "assistant");
+    bubble.textContent = m.content;
+    chatEl.appendChild(bubble);
   }
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
 function renderAll() {
-  renderThreadList();
+  renderThreads();
   renderChat();
 }
+renderAll();
 
-function ensureActiveThread() {
-  if (!threads.length) {
-    const t = newThread();
-    threads = [t];
-    activeId = t.id;
-    saveThreads(threads);
-    return;
-  }
-  if (!activeId || !threads.some(t => t.id === activeId)) {
-    activeId = threads[0].id;
-  }
+// ===== Autosize input =====
+function autosize() {
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
 }
+inputEl.addEventListener("input", autosize);
+autosize();
 
-async function sendMessage() {
-  const text = (inputEl?.value || "").trim();
-  if (!text) return;
+// Enter to send (Shift+Enter = newline)
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
 
+sendBtn.onclick = send;
+if (newChatBtn) newChatBtn.onclick = () => {
+  const t = newThread();
+  threads.unshift(t);
+  activeId = t.id;
+  saveThreads(threads);
+  renderAll();
+};
+if (clearBtn) clearBtn.onclick = () => {
   const t = threads.find(x => x.id === activeId);
   if (!t) return;
-
-  // UI lock
-  sendBtn.disabled = true;
-
-  // push user msg
-  t.messages.push({ role: "user", content: text, at: nowIso() });
-  if (t.messages.length === 1) t.title = pickTitleFromText(text);
+  t.messages = [];
+  t.title = "新しいチャット";
   t.updatedAt = nowIso();
   saveThreads(threads);
   renderAll();
+};
 
-  inputEl.value = "";
-  inputEl.style.height = "auto";
+function addMessage(role, content) {
+  const t = threads.find(x => x.id === activeId);
+  if (!t) return;
 
-  try {
-    const payload = {
-      message: text,
-      thread_id: t.id,
-      history: t.messages
-        .filter(m => m.role === "user" || m.role === "assistant")
-        .slice(-12)
-        .map(m => ({ role: m.role, content: m.content })),
-    };
+  t.messages.push({ role, content, at: nowIso() });
+  t.updatedAt = nowIso();
 
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = data?.reply || `HTTP ${res.status}`;
-      t.messages.push({ role: "assistant", content: msg, at: nowIso() });
-      saveThreads(threads);
-      renderAll();
-      return;
-    }
-
-    const reply = String(data?.reply ?? "");
-    const sources = Array.isArray(data?.sources) ? data.sources : [];
-    t.messages.push({ role: "assistant", content: reply, sources, at: nowIso() });
-    t.updatedAt = nowIso();
-    saveThreads(threads);
-    renderAll();
-  } catch (e) {
-    t.messages.push({ role: "assistant", content: `エラー：${e?.message || e}`, at: nowIso() });
-    saveThreads(threads);
-    renderAll();
-  } finally {
-    sendBtn.disabled = false;
-    inputEl.focus();
+  if (t.messages.length === 1 && role === "user") {
+    t.title = content.slice(0, 18) + (content.length > 18 ? "…" : "");
   }
-}
 
-function bindEvents() {
-  newBtn?.addEventListener("click", () => {
-    const t = newThread();
-    threads.unshift(t);
-    activeId = t.id;
-    saveThreads(threads);
-    renderAll();
-    inputEl?.focus();
-  });
-
-  clearBtn?.addEventListener("click", () => {
-    if (!confirm("この会話を削除しますか？")) return;
-    threads = threads.filter(t => t.id !== activeId);
-    activeId = threads[0]?.id || null;
-    ensureActiveThread();
-    saveThreads(threads);
-    renderAll();
-  });
-
-  sendBtn?.addEventListener("click", sendMessage);
-
-  inputEl?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  // autosize
-  inputEl?.addEventListener("input", () => {
-    inputEl.style.height = "auto";
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
-  });
-}
-
-function init() {
-  threads = loadThreads();
-  ensureActiveThread();
-  bindEvents();
+  saveThreads(threads);
   renderAll();
-  inputEl?.focus();
 }
-
-document.addEventListener("DOMContentLoaded", init);
