@@ -23,7 +23,7 @@
       <div id="threadList" class="thread-list"></div>
 
       <div class="footer-note">
-        ※ 公開運用ではレート制限 / Turnstile 推奨
+        ※ 公開運用ではレート制限の設定を推奨
       </div>
     </aside>
 
@@ -37,13 +37,14 @@
 
       <section id="chat" class="chat"></section>
 
-      <form class="composer" onsubmit="return false;">
+      <section class="composer">
         <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
-        <button id="sendBtn" class="btn btn-primary" type="button">送信</button>
-</form>
+        <button id="sendBtn" class="btn btn-primary">送信</button>
+        <div
+      </section>
     </main>
   </div>
 
-  <script src="./app.js?v=99"></script>
+  <script src="./app.js?v=7"></script>
 </body>
 </html>
