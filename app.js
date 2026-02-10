@@ -211,4 +211,3 @@ async function send() {
     renderAll();
   }
 }
- 
