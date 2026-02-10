@@ -1,6 +1,20 @@
 // ===== Config =====
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
+// ===== Turnstile token holder (最重要) =====
+let TURNSTILE_TOKEN = "";
+
+// Turnstile (index.html の data-callback から呼ばれる)
+window.onTurnstileSuccess = function (token) {
+  TURNSTILE_TOKEN = token || "";
+};
+window.onTurnstileExpired = function () {
+  TURNSTILE_TOKEN = "";
+};
+window.onTurnstileError = function () {
+  TURNSTILE_TOKEN = "";
+};
+
 // ===== Storage =====
 const LS_KEY = "public_rag_chat_threads_v1";
 const nowIso = () => new Date().toISOString();
@@ -133,18 +147,17 @@ function addMessage(role, content) {
 }
 
 function getTurnstileToken() {
-  // Turnstileのresponseは hidden input/textarea として入る
-  const el =
-    document.querySelector('textarea[name="cf-turnstile-response"]') ||
-    document.querySelector('input[name="cf-turnstile-response"]');
-  return el ? (el.value || "") : "";
+  // callback方式なので、DOM探索せず確実に取れる
+  return TURNSTILE_TOKEN || "";
 }
 
 function resetTurnstile() {
-  // 使い回し防止で都度リセット
+  // 送信後にtokenは無効になることがあるので、毎回リセット
   if (window.turnstile && typeof window.turnstile.reset === "function") {
     try { window.turnstile.reset(); } catch { /* ignore */ }
   }
+  // token holder も空に
+  TURNSTILE_TOKEN = "";
 }
 
 /**
@@ -170,7 +183,6 @@ async function callApi(userText) {
 
   const data = await res.json().catch(() => ({}));
 
-  // 403（Turnstile失敗）や 429（レート制限）でも reply を出す
   if (!res.ok) {
     const msg = data?.reply || `API error: ${res.status}`;
     throw new Error(msg);
@@ -189,7 +201,7 @@ async function send() {
   // Turnstile未完了なら先に止める（UI側の親切ガード）
   const token = getTurnstileToken();
   if (!token) {
-    addMessage("assistant", "Turnstile認証が未完了です。チェック（認証）後に送信してください。");
+    addMessage("assistant", "Turnstile認証が未完了です。認証（成功表示）後に送信してください。");
     return;
   }
 
@@ -229,7 +241,7 @@ async function send() {
     saveThreads(threads);
     renderAll();
   } finally {
-    // 使い回し防止：送信後に毎回リセット
+    // 使い回し防止：送信後に毎回リセット（次の認証を促す）
     resetTurnstile();
   }
 }
