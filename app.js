@@ -160,6 +160,20 @@ function getTurnstileToken() {
   return v;
 }
 
+function waitForTurnstileToken(timeoutMs = 3000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const t = getTurnstileToken();
+      if (t) return resolve(t);
+      if (Date.now() - start > timeoutMs) return reject(new Error("Turnstile token timeout"));
+      setTimeout(tick, 80);
+    };
+    tick();
+  });
+}
+
+
 // reset policies
 function resetTurnstileSoft() {
   // 成功時：トークンだけ空に（UIのwidgetは触らない）
@@ -256,11 +270,17 @@ async function send() {
     saveThreads(threads);
     renderAll();
   } finally {
-    // 成功時はsoft、失敗時だけhard reset
-    if (ok) resetTurnstileSoft();
-    else resetTurnstileHard();
+    // 成功/失敗どちらでも次のトークンを取り直す（使い回し・空白時間を避ける）
+    resetTurnstileHard();
 
     SENDING = false;
-    sendBtn.disabled = false;
+
+    // 取り直し中の連打を防ぐ（トークンが入るまで送信ボタンを無効化）
+    sendBtn.disabled = true;
+    waitForTurnstileToken(3000)
+      .catch(() => null)
+      .finally(() => {
+        sendBtn.disabled = false;
+      });
   }
 }
