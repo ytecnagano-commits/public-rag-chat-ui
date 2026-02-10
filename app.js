@@ -32,6 +32,7 @@ const elThreadTitle = $("#threadTitle");
 const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
+const elRateBanner = $("#rateBanner");
 
 // ===== State =====
 let threads = loadThreads();
@@ -59,7 +60,39 @@ function scrollChatToBottom() {
   // chat is a section; scroll within page
   elChat.scrollTop = elChat.scrollHeight;
 }
+let rateTimer = null;
 
+function showRateBanner(seconds) {
+  if (!elRateBanner) return;
+
+  // 既存タイマー停止
+  if (rateTimer) clearInterval(rateTimer);
+
+  let remain = Math.max(0, Number(seconds || 20));
+  elRateBanner.hidden = false;
+
+  const render = () => {
+    elRateBanner.textContent = `アクセスが多すぎます。${remain}秒待ってから再試行してください。`;
+  };
+  render();
+
+  // 待機中は送信不可（入力は残してOK）
+  elSendBtn.disabled = true;
+
+  rateTimer = setInterval(() => {
+    remain -= 1;
+    if (remain <= 0) {
+      clearInterval(rateTimer);
+      rateTimer = null;
+      elRateBanner.hidden = true;
+      elRateBanner.textContent = "";
+      elSendBtn.disabled = false;
+      elInput.focus();
+      return;
+    }
+    render();
+  }, 1000);
+}
 // ===== Render =====
 function renderThreadList() {
   elThreadList.innerHTML = "";
@@ -210,9 +243,21 @@ async function sendMessage() {
     if (reply) addMessage("assistant", reply, sources);
     else addMessage("assistant", "（応答が空でした）", sources);
   } catch (e) {
+  // 429: rate limit -> banner + countdown
+  if (e?.status === 429) {
+    const retry =
+      Number(e?.data?.retry_after) ||
+      Number(e?.data?.retryAfter) ||
+      Number(e?.data?.retryAfterSec) ||
+      20;
+
+    showRateBanner(retry);
+    // チャットにはエラーを出さない（うるさくなるので）
+  } else {
     const msg = (e && e.message) ? e.message : String(e);
     addMessage("assistant", `エラー：${msg}`);
-  } finally {
+  }
+} finally {
     setSending(false);
     elInput.focus();
   }
