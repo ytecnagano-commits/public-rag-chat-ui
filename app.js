@@ -32,11 +32,17 @@ const elThreadTitle = $("#threadTitle");
 const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
-const elRateBanner = $("#rateBanner");
+const elRateBanner  = $("#rateBanner");
 
 // ===== State =====
 let threads = loadThreads();
 let activeId = (threads[0] && threads[0].id) || null;
+
+// sending / rate limit state
+let isSending = false;
+let rateLocked = false;
+let rateTimer = null;
+let currentAbort = null;
 
 function getActiveThread() {
   return threads.find(t => t.id === activeId) || null;
@@ -60,12 +66,29 @@ function scrollChatToBottom() {
   // chat is a section; scroll within page
   elChat.scrollTop = elChat.scrollHeight;
 }
-let rateTimer = null;
+
+function updateComposerState() {
+  const disabled = isSending || rateLocked;
+  elSendBtn.disabled = disabled;
+  elInput.disabled = disabled;
+  elSendBtn.classList.toggle("is-loading", isSending);
+}
+
+function setSending(v) {
+  isSending = !!v;
+  updateComposerState();
+}
 
 function showRateBanner(seconds) {
   if (!elRateBanner) return;
 
-  // 既存タイマー停止
+  // lock composer
+  rateLocked = true;
+  updateComposerState();
+
+  // stop in-flight request (prevents late replies during cooldown)
+  try { currentAbort?.abort(); } catch {}
+
   if (rateTimer) clearInterval(rateTimer);
 
   let remain = Math.max(0, Number(seconds || 20));
@@ -76,9 +99,6 @@ function showRateBanner(seconds) {
   };
   render();
 
-  // 待機中は送信不可（入力は残してOK）
-  elSendBtn.disabled = true;
-
   rateTimer = setInterval(() => {
     remain -= 1;
     if (remain <= 0) {
@@ -86,13 +106,15 @@ function showRateBanner(seconds) {
       rateTimer = null;
       elRateBanner.hidden = true;
       elRateBanner.textContent = "";
-      elSendBtn.disabled = false;
+      rateLocked = false;
+      updateComposerState();
       elInput.focus();
       return;
     }
     render();
   }, 1000);
 }
+
 // ===== Render =====
 function renderThreadList() {
   elThreadList.innerHTML = "";
@@ -178,10 +200,15 @@ async function callApi(message, threadId, history) {
     history: history || []
   };
 
+  // Abort previous request if any
+  try { currentAbort?.abort(); } catch {}
+  currentAbort = new AbortController();
+
   const res = await fetch(API_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: currentAbort.signal
   });
 
   // Try to parse JSON always
@@ -199,11 +226,6 @@ async function callApi(message, threadId, history) {
 }
 
 // ===== Actions =====
-function setSending(isSending) {
-  elSendBtn.disabled = isSending;
-  elInput.disabled = isSending;
-  elSendBtn.classList.toggle("is-loading", isSending);
-}
 
 function addMessage(role, content, sources) {
   const t = getActiveThread();
@@ -226,6 +248,9 @@ async function sendMessage() {
   const t = getActiveThread();
   if (!t) return;
 
+  // During cooldown, do nothing
+  if (rateLocked) return;
+
   const text = (elInput.value || "").trim();
   if (!text) return;
 
@@ -243,23 +268,18 @@ async function sendMessage() {
     if (reply) addMessage("assistant", reply, sources);
     else addMessage("assistant", "（応答が空でした）", sources);
   } catch (e) {
-  // 429: rate limit -> banner + countdown
-  if (e?.status === 429) {
-    const retry =
-      Number(e?.data?.retry_after) ||
-      Number(e?.data?.retryAfter) ||
-      Number(e?.data?.retryAfterSec) ||
-      20;
-
-    showRateBanner(retry);
-    // チャットにはエラーを出さない（うるさくなるので）
-  } else {
-    const msg = (e && e.message) ? e.message : String(e);
-    addMessage("assistant", `エラー：${msg}`);
-  }
-} finally {
+    if (e?.name === "AbortError") {
+      // do nothing
+    } else if (e?.status === 429) {
+      const retry = Number(e?.data?.retry_after ?? 20);
+      showRateBanner(retry);
+    } else {
+      const msg = (e && e.message) ? e.message : String(e);
+      addMessage("assistant", `エラー：${msg}`);
+    }
+  } finally {
     setSending(false);
-    elInput.focus();
+    if (!rateLocked) elInput.focus();
   }
 }
 
