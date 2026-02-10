@@ -1,22 +1,13 @@
-// ===== Config =====
+"use strict";
+
+// ===== Workers URL =====
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
-// ===== Turnstile token holder =====
-let TURNSTILE_TOKEN = "";
-
-window.onTurnstileSuccess = function (token) {
-  TURNSTILE_TOKEN = token || "";
-};
-window.onTurnstileExpired = function () {
-  TURNSTILE_TOKEN = "";
-};
-window.onTurnstileError = function () {
-  TURNSTILE_TOKEN = "";
-};
-
-// ===== Storage =====
+// ===== LocalStorage =====
 const LS_KEY = "public_rag_chat_threads_v1";
 const nowIso = () => new Date().toISOString();
+
+const $ = (sel) => document.querySelector(sel);
 
 function loadThreads() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
@@ -34,244 +25,202 @@ function newThread() {
     messages: []
   };
 }
-
-let threads = loadThreads();
-if (!threads.length) {
-  threads = [newThread()];
-  saveThreads(threads);
-}
-let activeId = threads[0].id;
-
-// ===== DOM =====
-const chatEl = document.getElementById("chat");
-const inputEl = document.getElementById("input");
-const sendBtn = document.getElementById("sendBtn");
-const newChatBtn = document.getElementById("newChatBtn");
-const clearBtn = document.getElementById("clearBtn");
-const threadListEl = document.getElementById("threadList");
-const threadTitleEl = document.getElementById("threadTitle");
-
-if (!chatEl || !inputEl || !sendBtn || !threadListEl || !threadTitleEl) {
-  console.error("Missing required DOM elements. Check element IDs in index.html.");
+function pickTitleFromText(text) {
+  const t = (text || "").trim().replace(/\s+/g, " ");
+  return t.length > 24 ? t.slice(0, 24) + "…" : (t || "新しいチャット");
 }
 
-// ===== Render =====
-function renderThreads() {
-  threadListEl.innerHTML = "";
-  const sorted = [...threads].sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1));
-  for (const t of sorted) {
+// ===== UI refs =====
+let threads = [];
+let activeId = null;
+
+const listEl = $("#threadList");
+const newBtn = $("#newThreadBtn");
+const titleEl = $("#threadTitle");
+const clearBtn = $("#clearThreadBtn");
+const chatEl = $("#chat");
+const inputEl = $("#input");
+const sendBtn = $("#sendBtn");
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderThreadList() {
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  threads.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "thread" + (t.id === activeId ? " active" : "");
-    div.onclick = () => { activeId = t.id; renderAll(); };
-
-    const title = document.createElement("div");
-    title.className = "thread-title";
-    title.textContent = t.title || "チャット";
-
-    const meta = document.createElement("div");
-    meta.className = "thread-meta";
-    meta.textContent = `${t.messages.length} messages`;
-
-    div.appendChild(title);
-    div.appendChild(meta);
-    threadListEl.appendChild(div);
-  }
+    div.className = "threadItem" + (t.id === activeId ? " active" : "");
+    div.innerHTML = `
+      <div class="threadTitle">${escapeHtml(t.title)}</div>
+      <div class="threadMeta">${escapeHtml((t.messages?.length || 0) + " messages")}</div>
+    `;
+    div.addEventListener("click", () => {
+      activeId = t.id;
+      saveThreads(threads);
+      renderAll();
+    });
+    listEl.appendChild(div);
+  });
 }
 
 function renderChat() {
+  if (!chatEl) return;
   const t = threads.find(x => x.id === activeId);
-  threadTitleEl.textContent = t?.title || "チャット";
+  if (!t) return;
+
+  titleEl && (titleEl.textContent = t.title);
 
   chatEl.innerHTML = "";
-  for (const m of (t?.messages || [])) {
-    const bubble = document.createElement("div");
-    bubble.className = "msg " + (m.role === "user" ? "user" : "assistant");
-    bubble.textContent = m.content;
-    chatEl.appendChild(bubble);
+  for (const m of t.messages) {
+    const row = document.createElement("div");
+    row.className = "msgRow " + (m.role === "user" ? "user" : "assistant");
+    row.innerHTML = `
+      <div class="msgBubble">
+        <div class="msgText">${escapeHtml(m.content).replaceAll("\n", "<br>")}</div>
+        ${m.sources?.length ? `
+          <div class="msgSources">
+            <div class="srcHead">【参照】</div>
+            <ul>
+              ${m.sources.map(s =>
+                `<li>${escapeHtml(s.title || s.id)}（score ${Number(s.score ?? 0).toFixed(3)}）</li>`
+              ).join("")}
+            </ul>
+          </div>` : ""
+        }
+      </div>
+    `;
+    chatEl.appendChild(row);
   }
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
 function renderAll() {
-  renderThreads();
+  renderThreadList();
   renderChat();
 }
-renderAll();
 
-// ===== Autosize input =====
-function autosize() {
-  inputEl.style.height = "auto";
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
-}
-inputEl.addEventListener("input", autosize);
-autosize();
-
-// Enter to send (Shift+Enter = newline)
-inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    send();
+function ensureActiveThread() {
+  if (!threads.length) {
+    const t = newThread();
+    threads = [t];
+    activeId = t.id;
+    saveThreads(threads);
+    return;
   }
-});
-
-sendBtn.onclick = send;
-if (newChatBtn) newChatBtn.onclick = () => {
-  const t = newThread();
-  threads.unshift(t);
-  activeId = t.id;
-  saveThreads(threads);
-  renderAll();
-};
-if (clearBtn) clearBtn.onclick = () => {
-  const t = threads.find(x => x.id === activeId);
-  if (!t) return;
-  t.messages = [];
-  t.title = "新しいチャット";
-  t.updatedAt = nowIso();
-  saveThreads(threads);
-  renderAll();
-};
-
-function addMessage(role, content) {
-  const t = threads.find(x => x.id === activeId);
-  if (!t) return;
-
-  t.messages.push({ role, content, at: nowIso() });
-  t.updatedAt = nowIso();
-
-  if (t.messages.length === 1 && role === "user") {
-    t.title = content.slice(0, 18) + (content.length > 18 ? "…" : "");
-  }
-
-  saveThreads(threads);
-  renderAll();
-}
-
-// ===== Turnstile token getter (hybrid) =====
-function getTurnstileToken() {
-  // ① callback保持
-  if (TURNSTILE_TOKEN) return TURNSTILE_TOKEN;
-
-  // ② hidden field fallback
-  const el =
-    document.querySelector('input[name="cf-turnstile-response"]') ||
-    document.querySelector('textarea[name="cf-turnstile-response"]');
-  const v = el ? (el.value || "") : "";
-  return v;
-}
-
-function waitForTurnstileToken(timeoutMs = 3000) {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    const tick = () => {
-      const t = getTurnstileToken();
-      if (t) return resolve(t);
-      if (Date.now() - start > timeoutMs) return reject(new Error("Turnstile token timeout"));
-      setTimeout(tick, 80);
-    };
-    tick();
-  });
-}
-
-
-// reset policies
-function resetTurnstileSoft() {
-  // 成功時：トークンだけ空に（UIのwidgetは触らない）
-  TURNSTILE_TOKEN = "";
-}
-function resetTurnstileHard() {
-  // 失敗時：widgetをリセットして取り直す
-  TURNSTILE_TOKEN = "";
-  if (window.turnstile && typeof window.turnstile.reset === "function") {
-    try { window.turnstile.reset(); } catch { /* ignore */ }
+  if (!activeId || !threads.some(t => t.id === activeId)) {
+    activeId = threads[0].id;
   }
 }
 
-/**
- * Returns:
- * { reply: string, sources: Array<{id?:string, title?:string, score?:number}> }
- */
-async function callApi(userText, token) {
-  const t = threads.find(x => x.id === activeId);
-
-  const payload = {
-    message: userText,
-    thread_id: activeId,
-    history: (t?.messages || []).slice(-10),
-    // turnstileToken は任意（広告ブロッカー等で取得できない場合がある）
-      ... (token ? { turnstileToken: token } : {} )
-  };
-
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.reply || `API error: ${res.status}`);
-
-  return {
-    reply: data.reply ?? "",
-    sources: Array.isArray(data.sources) ? data.sources : []
-  };
-}
-
-let SENDING = false;
-
-async function send() {
-  if (SENDING) return; // 連打防止（token取り直し前の空送信を防ぐ）
-  const text = inputEl.value.trim();
+async function sendMessage() {
+  const text = (inputEl?.value || "").trim();
   if (!text) return;
 
-  const token = getTurnstileToken();
-  if (!token) {
-}
+  const t = threads.find(x => x.id === activeId);
+  if (!t) return;
 
-  SENDING = true;
+  // UI lock
   sendBtn.disabled = true;
 
+  // push user msg
+  t.messages.push({ role: "user", content: text, at: nowIso() });
+  if (t.messages.length === 1) t.title = pickTitleFromText(text);
+  t.updatedAt = nowIso();
+  saveThreads(threads);
+  renderAll();
+
   inputEl.value = "";
-  autosize();
-
-  addMessage("user", text);
-  addMessage("assistant", "…");
-
-  const t = threads.find(x => x.id === activeId);
-  const idx = t.messages.length - 1;
-
-  let ok = false;
+  inputEl.style.height = "auto";
 
   try {
-    const result = await callApi(text, token);
-    ok = true;
+    const payload = {
+      message: text,
+      thread_id: t.id,
+      history: t.messages
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .slice(-12)
+        .map(m => ({ role: m.role, content: m.content })),
+    };
 
-    const replyText = result.reply ?? "";
-    const sources = result.sources ?? [];
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-    let appended = replyText;
-    if (sources.length) {
-      appended += `\n\n【参照】`;
-      for (const s of sources.slice(0, 5)) {
-        const title = s.title || s.id || "source";
-        const score = (typeof s.score === "number") ? `（score ${s.score.toFixed(3)}）` : "";
-        appended += `\n・${title}${score}`;
-      }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data?.reply || `HTTP ${res.status}`;
+      t.messages.push({ role: "assistant", content: msg, at: nowIso() });
+      saveThreads(threads);
+      renderAll();
+      return;
     }
 
-    t.messages[idx].content = appended;
+    const reply = String(data?.reply ?? "");
+    const sources = Array.isArray(data?.sources) ? data.sources : [];
+    t.messages.push({ role: "assistant", content: reply, sources, at: nowIso() });
     t.updatedAt = nowIso();
     saveThreads(threads);
     renderAll();
   } catch (e) {
-    t.messages[idx].content = `エラー：${e.message}`;
-    t.updatedAt = nowIso();
+    t.messages.push({ role: "assistant", content: `エラー：${e?.message || e}`, at: nowIso() });
     saveThreads(threads);
     renderAll();
   } finally {
-  // Turnstileは任意。送信完了後はそのままUIを復帰させる
-  SENDING = false;
-  sendBtn.disabled = false;
-});
+    sendBtn.disabled = false;
+    inputEl.focus();
   }
 }
+
+function bindEvents() {
+  newBtn?.addEventListener("click", () => {
+    const t = newThread();
+    threads.unshift(t);
+    activeId = t.id;
+    saveThreads(threads);
+    renderAll();
+    inputEl?.focus();
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    if (!confirm("この会話を削除しますか？")) return;
+    threads = threads.filter(t => t.id !== activeId);
+    activeId = threads[0]?.id || null;
+    ensureActiveThread();
+    saveThreads(threads);
+    renderAll();
+  });
+
+  sendBtn?.addEventListener("click", sendMessage);
+
+  inputEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // autosize
+  inputEl?.addEventListener("input", () => {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
+  });
+}
+
+function init() {
+  threads = loadThreads();
+  ensureActiveThread();
+  bindEvents();
+  renderAll();
+  inputEl?.focus();
+}
+
+document.addEventListener("DOMContentLoaded", init);
