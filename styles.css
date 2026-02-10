@@ -82,6 +82,7 @@ body{
   display:grid;
   grid-template-rows: 58px 1fr auto;
   min-width:0;
+  min-height:0;
 }
 
 .topbar{
@@ -102,6 +103,7 @@ body{
   display:flex;
   flex-direction:column;
   gap:14px;
+  min-height:0;
 }
 
 .msg{
@@ -129,6 +131,12 @@ body{
   border-top:1px solid var(--border);
   background: rgba(15,22,34,.35);
   padding: 12px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.composer-row{
   display:flex;
   gap:10px;
   align-items:flex-end;
@@ -167,14 +175,4 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
 @media (max-width: 900px){
   .app{grid-template-columns: 1fr}
   .sidebar{display:none}
-}
-.rate-banner{
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  border: 1px solid rgba(255, 99, 71, .45);
-  background: rgba(255, 99, 71, .12);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.4;
 }
