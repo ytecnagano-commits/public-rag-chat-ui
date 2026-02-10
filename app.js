@@ -162,6 +162,7 @@ async function callApi(userText) {
   }
 
   const data = await res.json().catch(() => ({}));
+  console.log("API response:", data);
   return {
     reply: data.reply ?? data.message ?? "",
     sources: Array.isArray(data.sources) ? data.sources : []
