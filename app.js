@@ -132,21 +132,34 @@ function addMessage(role, content) {
   renderAll();
 }
 
+function getTurnstileToken() {
+  // Turnstileのresponseは hidden input/textarea として入る
+  const el =
+    document.querySelector('textarea[name="cf-turnstile-response"]') ||
+    document.querySelector('input[name="cf-turnstile-response"]');
+  return el ? (el.value || "") : "";
+}
+
+function resetTurnstile() {
+  // 使い回し防止で都度リセット
+  if (window.turnstile && typeof window.turnstile.reset === "function") {
+    try { window.turnstile.reset(); } catch { /* ignore */ }
+  }
+}
+
 /**
  * Returns:
  * { reply: string, sources: Array<{id?:string, title?:string, score?:number}> }
  */
 async function callApi(userText) {
-  if (!API_URL) {
-    await new Promise(r => setTimeout(r, 400));
-    return { reply: `（ダミー）\n${userText}`, sources: [] };
-  }
-
   const t = threads.find(x => x.id === activeId);
+  const turnstileToken = getTurnstileToken();
+
   const payload = {
     message: userText,
     thread_id: activeId,
-    history: (t?.messages || []).slice(-10)
+    history: (t?.messages || []).slice(-10),
+    turnstileToken
   };
 
   const res = await fetch(API_URL, {
@@ -155,13 +168,13 @@ async function callApi(userText) {
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`API error: ${res.status} ${txt}`);
-  }
-
   const data = await res.json().catch(() => ({}));
-  console.log("API response:", data); // ★ sourcesが来てるか確認用
+
+  // 403（Turnstile失敗）や 429（レート制限）でも reply を出す
+  if (!res.ok) {
+    const msg = data?.reply || `API error: ${res.status}`;
+    throw new Error(msg);
+  }
 
   return {
     reply: data.reply ?? data.message ?? "",
@@ -172,6 +185,13 @@ async function callApi(userText) {
 async function send() {
   const text = inputEl.value.trim();
   if (!text) return;
+
+  // Turnstile未完了なら先に止める（UI側の親切ガード）
+  const token = getTurnstileToken();
+  if (!token) {
+    addMessage("assistant", "Turnstile認証が未完了です。チェック（認証）後に送信してください。");
+    return;
+  }
 
   inputEl.value = "";
   autosize();
@@ -208,5 +228,8 @@ async function send() {
     t.updatedAt = nowIso();
     saveThreads(threads);
     renderAll();
+  } finally {
+    // 使い回し防止：送信後に毎回リセット
+    resetTurnstile();
   }
 }
