@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Public RAG Chat</title>
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
   <div class="app">
@@ -40,6 +41,7 @@
       <section class="composer">
         <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
         <button id="sendBtn" class="btn btn-primary">送信</button>
+        <div class="cf-turnstile" data-sitekey="あなたのSITE_KEY"></div>
       </section>
     </main>
   </div>
