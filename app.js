@@ -1,10 +1,9 @@
 // ===== Config =====
-const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat?debug=ts";
+const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
-// ===== Turnstile token holder (最重要) =====
+// ===== Turnstile token holder =====
 let TURNSTILE_TOKEN = "";
 
-// Turnstile (index.html の data-callback から呼ばれる)
 window.onTurnstileSuccess = function (token) {
   TURNSTILE_TOKEN = token || "";
 };
@@ -93,7 +92,6 @@ function renderAll() {
   renderThreads();
   renderChat();
 }
-
 renderAll();
 
 // ===== Autosize input =====
@@ -137,7 +135,6 @@ function addMessage(role, content) {
   t.messages.push({ role, content, at: nowIso() });
   t.updatedAt = nowIso();
 
-  // Auto title from first user message
   if (t.messages.length === 1 && role === "user") {
     t.title = content.slice(0, 18) + (content.length > 18 ? "…" : "");
   }
@@ -147,32 +144,33 @@ function addMessage(role, content) {
 }
 
 function getTurnstileToken() {
-  // callback方式なので、DOM探索せず確実に取れる
-  return TURNSTILE_TOKEN || "";
+  // ① callbackで保持しているtoken（最優先）
+  if (TURNSTILE_TOKEN) return TURNSTILE_TOKEN;
+
+  // ② hidden field からも拾う（Turnstileの描画方式差異対策）
+  const el =
+    document.querySelector('input[name="cf-turnstile-response"]') ||
+    document.querySelector('textarea[name="cf-turnstile-response"]');
+  const v = el ? (el.value || "") : "";
+  return v;
 }
 
 function resetTurnstile() {
-  // 送信後にtokenは無効になることがあるので、毎回リセット
   if (window.turnstile && typeof window.turnstile.reset === "function") {
     try { window.turnstile.reset(); } catch { /* ignore */ }
   }
-  // token holder も空に
   TURNSTILE_TOKEN = "";
 }
 
-/**
- * Returns:
- * { reply: string, sources: Array<{id?:string, title?:string, score?:number}> }
- */
 async function callApi(userText) {
   const t = threads.find(x => x.id === activeId);
-  const turnstileToken = getTurnstileToken();
+  const token = getTurnstileToken();
 
   const payload = {
     message: userText,
     thread_id: activeId,
     history: (t?.messages || []).slice(-10),
-    turnstileToken
+    turnstileToken: token
   };
 
   const res = await fetch(API_URL, {
@@ -182,14 +180,10 @@ async function callApi(userText) {
   });
 
   const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const msg = data?.reply || `API error: ${res.status}`;
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error(data?.reply || `API error: ${res.status}`);
 
   return {
-    reply: data.reply ?? data.message ?? "",
+    reply: data.reply ?? "",
     sources: Array.isArray(data.sources) ? data.sources : []
   };
 }
@@ -198,10 +192,10 @@ async function send() {
   const text = inputEl.value.trim();
   if (!text) return;
 
-  // Turnstile未完了なら先に止める（UI側の親切ガード）
+  // 送信直前にtokenを必ず読む
   const token = getTurnstileToken();
   if (!token) {
-    addMessage("assistant", "Turnstile認証が未完了です。認証（成功表示）後に送信してください。");
+    addMessage("assistant", "Turnstileトークンが取得できていません。ページを再読み込みして、成功表示後に送信してください。");
     return;
   }
 
@@ -209,19 +203,17 @@ async function send() {
   autosize();
 
   addMessage("user", text);
-  addMessage("assistant", "…");
+  addMessage("assistant", `…\n（debug: turnstileToken length=${token.length}）`);
 
   const t = threads.find(x => x.id === activeId);
   const idx = t.messages.length - 1;
 
   try {
     const result = await callApi(text);
-    const replyText = result?.reply ?? "";
-    const sources = Array.isArray(result?.sources) ? result.sources : [];
+    const replyText = result.reply ?? "";
+    const sources = result.sources ?? [];
 
     let appended = replyText;
-
-    // ★ 参照を必ず見える形式で追記
     if (sources.length) {
       appended += `\n\n【参照】`;
       for (const s of sources.slice(0, 5)) {
@@ -241,7 +233,7 @@ async function send() {
     saveThreads(threads);
     renderAll();
   } finally {
-    // 使い回し防止：送信後に毎回リセット（次の認証を促す）
+    // 送信後にreset（送信前に消さない）
     resetTurnstile();
   }
 }
