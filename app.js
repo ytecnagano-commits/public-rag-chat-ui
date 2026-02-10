@@ -51,6 +51,10 @@ const clearBtn = document.getElementById("clearBtn");
 const threadListEl = document.getElementById("threadList");
 const threadTitleEl = document.getElementById("threadTitle");
 
+if (!chatEl || !inputEl || !sendBtn || !threadListEl || !threadTitleEl) {
+  console.error("Missing required DOM elements. Check element IDs in index.html.");
+}
+
 // ===== Render =====
 function renderThreads() {
   threadListEl.innerHTML = "";
@@ -111,14 +115,14 @@ inputEl.addEventListener("keydown", (e) => {
 });
 
 sendBtn.onclick = send;
-newChatBtn.onclick = () => {
+if (newChatBtn) newChatBtn.onclick = () => {
   const t = newThread();
   threads.unshift(t);
   activeId = t.id;
   saveThreads(threads);
   renderAll();
 };
-clearBtn.onclick = () => {
+if (clearBtn) clearBtn.onclick = () => {
   const t = threads.find(x => x.id === activeId);
   if (!t) return;
   t.messages = [];
@@ -143,11 +147,12 @@ function addMessage(role, content) {
   renderAll();
 }
 
+// ===== Turnstile token getter (hybrid) =====
 function getTurnstileToken() {
-  // ① callbackで保持しているtoken（最優先）
+  // ① callback保持
   if (TURNSTILE_TOKEN) return TURNSTILE_TOKEN;
 
-  // ② hidden field からも拾う（Turnstileの描画方式差異対策）
+  // ② hidden field fallback
   const el =
     document.querySelector('input[name="cf-turnstile-response"]') ||
     document.querySelector('textarea[name="cf-turnstile-response"]');
@@ -155,21 +160,25 @@ function getTurnstileToken() {
   return v;
 }
 
+// reset policies
 function resetTurnstileSoft() {
-  // トークンだけ空にする（widgetは触らない）
+  // 成功時：トークンだけ空に（UIのwidgetは触らない）
   TURNSTILE_TOKEN = "";
 }
 function resetTurnstileHard() {
-  // widget自体をリセット（必要時のみ）
+  // 失敗時：widgetをリセットして取り直す
   TURNSTILE_TOKEN = "";
   if (window.turnstile && typeof window.turnstile.reset === "function") {
     try { window.turnstile.reset(); } catch { /* ignore */ }
   }
 }
 
-async function callApi(userText) {
+/**
+ * Returns:
+ * { reply: string, sources: Array<{id?:string, title?:string, score?:number}> }
+ */
+async function callApi(userText, token) {
   const t = threads.find(x => x.id === activeId);
-  const token = getTurnstileToken();
 
   const payload = {
     message: userText,
@@ -193,65 +202,27 @@ async function callApi(userText) {
   };
 }
 
+let SENDING = false;
+
 async function send() {
-  const text = inputEl.value.trim();
-  if (!text) return;
-
-  // 送信直前にtokenを必ず読む
-  const token = getTurnstileToken();
-  if (!token) {
-    addMessage("assistant", "Turnstileトークンが取得できていません。ページを再読み込みして、成功表示後に送信してください。");
-    return;
-  }
-
-  inputEl.value = "";
-  autosize();
-
-  addMessage("user", text);
-  addMessage("assistant", `…\n（debug: turnstileToken length=${token.length}）`);
-
-  const t = threads.find(x => x.id === activeId);
-  const idx = t.messages.length - 1;
-
-  try {
-    const result = await callApi(text);
-    const replyText = result.reply ?? "";
-    const sources = result.sources ?? [];
-
-    let appended = replyText;
-    if (sources.length) {
-      appended += `\n\n【参照】`;
-      for (const s of sources.slice(0, 5)) {
-        const title = s.title || s.id || "source";
-        const score = (typeof s.score === "number") ? `（score ${s.score.toFixed(3)}）` : "";
-        appended += `\n・${title}${score}`;
-      }
-    }
-
-    t.messages[idx].content = appended;
-    t.updatedAt = nowIso();
-    saveThreads(threads);
-    renderAll();
-  } catch (e) {
-    t.messages[idx].content = `エラー：${e.message}`;
-    t.updatedAt = nowIso();
-    saveThreads(threads);
-    renderAll();
-  async function send() {
+  if (SENDING) return; // 連打防止（token取り直し前の空送信を防ぐ）
   const text = inputEl.value.trim();
   if (!text) return;
 
   const token = getTurnstileToken();
   if (!token) {
-    addMessage("assistant", "Turnstileトークンが取得できていません。成功表示後に送信してください。");
+    addMessage("assistant", "Turnstileトークンが取得できていません。成功表示を待ってから送信してください。");
     return;
   }
+
+  SENDING = true;
+  sendBtn.disabled = true;
 
   inputEl.value = "";
   autosize();
 
   addMessage("user", text);
-  addMessage("assistant", `…\n（debug: turnstileToken length=${token.length}）`);
+  addMessage("assistant", "…");
 
   const t = threads.find(x => x.id === activeId);
   const idx = t.messages.length - 1;
@@ -259,7 +230,7 @@ async function send() {
   let ok = false;
 
   try {
-    const result = await callApi(text);
+    const result = await callApi(text, token);
     ok = true;
 
     const replyText = result.reply ?? "";
@@ -285,13 +256,11 @@ async function send() {
     saveThreads(threads);
     renderAll();
   } finally {
-    if (ok) {
-      // ✅ 成功時：トークンだけ空にする（resetしない）
-      resetTurnstileSoft();
-    } else {
-      // ❌ 失敗時：widgetもリセットして取り直す
-      resetTurnstileHard();
-    }
+    // 成功時はsoft、失敗時だけhard reset
+    if (ok) resetTurnstileSoft();
+    else resetTurnstileHard();
+
+    SENDING = false;
+    sendBtn.disabled = false;
   }
-}
 }
