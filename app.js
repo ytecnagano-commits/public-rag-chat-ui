@@ -1,5 +1,5 @@
 // ===== Config =====
-const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
+const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat?debug=ts";
 
 // ===== Turnstile token holder (最重要) =====
 let TURNSTILE_TOKEN = "";
