@@ -1,5 +1,5 @@
 // ===== 設定（あとでWorkers URLに差し替え）=====
-const API_URL = ""; // 例: "https://public-rag-api.xxx.workers.dev/chat"
+const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
 // ===== 簡易ストレージ（ブラウザ内）=====
 const LS_KEY = "public_rag_chat_threads_v1";
