@@ -155,11 +155,16 @@ function getTurnstileToken() {
   return v;
 }
 
-function resetTurnstile() {
+function resetTurnstileSoft() {
+  // トークンだけ空にする（widgetは触らない）
+  TURNSTILE_TOKEN = "";
+}
+function resetTurnstileHard() {
+  // widget自体をリセット（必要時のみ）
+  TURNSTILE_TOKEN = "";
   if (window.turnstile && typeof window.turnstile.reset === "function") {
     try { window.turnstile.reset(); } catch { /* ignore */ }
   }
-  TURNSTILE_TOKEN = "";
 }
 
 async function callApi(userText) {
@@ -232,8 +237,61 @@ async function send() {
     t.updatedAt = nowIso();
     saveThreads(threads);
     renderAll();
-  } finally {
-    // 送信後にreset（送信前に消さない）
-    resetTurnstile();
+  async function send() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  const token = getTurnstileToken();
+  if (!token) {
+    addMessage("assistant", "Turnstileトークンが取得できていません。成功表示後に送信してください。");
+    return;
   }
+
+  inputEl.value = "";
+  autosize();
+
+  addMessage("user", text);
+  addMessage("assistant", `…\n（debug: turnstileToken length=${token.length}）`);
+
+  const t = threads.find(x => x.id === activeId);
+  const idx = t.messages.length - 1;
+
+  let ok = false;
+
+  try {
+    const result = await callApi(text);
+    ok = true;
+
+    const replyText = result.reply ?? "";
+    const sources = result.sources ?? [];
+
+    let appended = replyText;
+    if (sources.length) {
+      appended += `\n\n【参照】`;
+      for (const s of sources.slice(0, 5)) {
+        const title = s.title || s.id || "source";
+        const score = (typeof s.score === "number") ? `（score ${s.score.toFixed(3)}）` : "";
+        appended += `\n・${title}${score}`;
+      }
+    }
+
+    t.messages[idx].content = appended;
+    t.updatedAt = nowIso();
+    saveThreads(threads);
+    renderAll();
+  } catch (e) {
+    t.messages[idx].content = `エラー：${e.message}`;
+    t.updatedAt = nowIso();
+    saveThreads(threads);
+    renderAll();
+  } finally {
+    if (ok) {
+      // ✅ 成功時：トークンだけ空にする（resetしない）
+      resetTurnstileSoft();
+    } else {
+      // ❌ 失敗時：widgetもリセットして取り直す
+      resetTurnstileHard();
+    }
+  }
+}
 }
