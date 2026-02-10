@@ -1,5 +1,5 @@
 // ===== Config =====
-const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat?debug=ts";
+const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 
 // ===== Turnstile token holder =====
 let TURNSTILE_TOKEN = "";
@@ -198,7 +198,8 @@ async function callApi(userText, token) {
     message: userText,
     thread_id: activeId,
     history: (t?.messages || []).slice(-10),
-    turnstileToken: token
+    // turnstileToken は任意（広告ブロッカー等で取得できない場合がある）
+      ... (token ? { turnstileToken: token } : {} )
   };
 
   const res = await fetch(API_URL, {
@@ -225,9 +226,7 @@ async function send() {
 
   const token = getTurnstileToken();
   if (!token) {
-    addMessage("assistant", "Turnstileトークンが取得できていません。成功表示を待ってから送信してください。");
-    return;
-  }
+}
 
   SENDING = true;
   sendBtn.disabled = true;
@@ -270,17 +269,9 @@ async function send() {
     saveThreads(threads);
     renderAll();
   } finally {
-    // 成功/失敗どちらでも次のトークンを取り直す（使い回し・空白時間を避ける）
-    resetTurnstileHard();
-
-    SENDING = false;
-
-    // 取り直し中の連打を防ぐ（トークンが入るまで送信ボタンを無効化）
-    sendBtn.disabled = true;
-    waitForTurnstileToken(3000)
-      .catch(() => null)
-      .finally(() => {
-        sendBtn.disabled = false;
-      });
+  // Turnstileは任意。送信完了後はそのままUIを復帰させる
+  SENDING = false;
+  sendBtn.disabled = false;
+});
   }
 }
