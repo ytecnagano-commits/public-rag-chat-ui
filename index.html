@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Public RAG Chat</title>
   <link rel="stylesheet" href="./styles.css" />
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
   <div class="app">
@@ -38,20 +37,21 @@
 
       <section id="chat" class="chat"></section>
 
-      <section class="composer">
+      <form class="composer" onsubmit="return false;">
         <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
-        <button id="sendBtn" class="btn btn-primary">送信</button>
+        <button id="sendBtn" class="btn btn-primary" type="button">送信</button>
         <div
           class="cf-turnstile"
-          data-sitekey="XXXXX伏せてるよ！XXXXX"
+          data-sitekey="0x4AAAAAACaMXjQTC8tJV95C"
           data-callback="onTurnstileSuccess"
           data-expired-callback="onTurnstileExpired"
           data-error-callback="onTurnstileError"
         ></div>
-      </section>
+      </form>
     </main>
   </div>
 
-  <script src="./app.js?v=6"></script>
+  <script src="./app.js?v=7"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
 </body>
 </html>
