@@ -168,3 +168,13 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   .app{grid-template-columns: 1fr}
   .sidebar{display:none}
 }
+.rate-banner{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 99, 71, .45);
+  background: rgba(255, 99, 71, .12);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
