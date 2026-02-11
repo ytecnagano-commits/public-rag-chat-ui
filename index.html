@@ -2,89 +2,50 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Public RAG Chat</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <img class="brand-avatar" src="./bot-avatar.jpg" alt="ワイテッくん" />
-        <div class="brand-text">
-          <div class="brand-title">
-            <div>Y-TEC トラブル解決BOT</div>
-            <div>【ワイテッくん】</div>
-          </div>
-          <div class="brand-sub">役に立ったり立たなかったりするよ！</div>
+        <div class="brand-dot"></div>
+        <div>
+          <div class="brand-title">Public RAG Chat</div>
+          <div class="brand-sub">ChatGPT風UI（静的HTML）</div>
         </div>
       </div>
 
       <button id="newChatBtn" class="btn btn-ghost">＋ 新しいチャット</button>
 
-      
-      <button id="toggleApiConfigBtn" class="btn btn-ghost btn-small" type="button" hidden>接続先設定</button>
-      <div id="apiConfigWrap" hidden>
-<div class="section-title">接続先</div>
-      <div class="api-config">
-        <input id="apiUrlInput" class="input" type="url" spellcheck="false" />
-        <button id="saveApiUrlBtn" class="btn btn-ghost">保存</button>
-        <div class="api-hint">※ /chat が 405 のときは Workers のURL（…workers.dev/chat）を入れてください</div>
-      </div>
-
-      </div>
-
-
       <div class="section-title">履歴（このブラウザ）</div>
       <div id="threadList" class="thread-list"></div>
 
-      <div class="section-title">管理</div>
-      <div class="metrics">
-        <div class="metrics-row">
-          <div class="metrics-label">Bucket</div>
-          <div class="metrics-val" id="metricsBucket">-</div>
-        </div>
-        <div class="metrics-grid">
-          <div class="metrics-card"><div class="k">req</div><div class="v" id="mReq">0</div></div>
-          <div class="metrics-card"><div class="k">ok</div><div class="v" id="mOk">0</div></div>
-          <div class="metrics-card"><div class="k">429</div><div class="v" id="mRl">0</div></div>
-          <div class="metrics-card"><div class="k">err</div><div class="v" id="mErr">0</div></div>
-        </div>
-        <div class="metrics-updated">更新: <span id="metricsUpdated">-</span></div>
+      <div class="footer-note">
+        ※ 公開運用ではレート制限の設定を推奨
       </div>
-
-      <div class="footer-note">Copyright (C) 2026- Y-TEC</div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div id="threadTitle" class="thread-title-top">新しいチャット</div>
-        <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
+        <div class="topbar-actions">
+          <button id="copyBtn" class="btn btn-ghost">コピー</button>
+          <button id="downloadBtn" class="btn btn-ghost">DL</button>
+          <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
+        </div>
       </header>
 
       <section id="chat" class="chat"></section>
 
       <section class="composer">
-        <div id="rateBanner" class="rate-banner" hidden>
-          <div id="rateBannerText"></div>
-          <label class="rate-toggle">
-            <input id="rateAutoResend" type="checkbox" checked />
-            解除後に自動で再送
-          </label>
-        </div>
-
-        <div id="statusLine" class="status-line" hidden>
-          <span id="statusText"></span>
-        </div>
-
-        <div class="composer-row">
-          <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
-          <button id="sendBtn" class="btn btn-primary">送信</button>
-        </div>
+        <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
+        <button id="sendBtn" class="btn btn-primary">送信</button>
       </section>
     </main>
   </div>
 
-  <script src="./app.js?v=25"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>
