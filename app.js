@@ -1,4 +1,4 @@
-// ===== Config =====
+/// ===== Config =====
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
 // Transient errors that are worth retrying
