@@ -1,11 +1,13 @@
 // ===== Config =====
+const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
+const METRICS_URL = API_URL.replace(/\/chat$/, "/metrics");
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
-const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
-const METRICS_URL = API_URL.replace(/\/chat\b/, "/metrics");
+// Transient errors that are worth retrying
+const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 522, 524]);
 
 // ===== Storage =====
-const LS_KEY = "public_rag_chat_threads_v1";
+const LS_KEY = "public_rag_chat_threads_v2";
 const nowIso = () => new Date().toISOString();
 
 function loadThreads() {
@@ -36,20 +38,18 @@ const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
 
-// banner
-const elBanner       = $("#rateBanner");
-const elBannerText   = $("#rateBannerText");
-const elAutoResend   = $("#rateAutoResend");
-
-// status
-const elStatusLine  = $("#statusLine");
-const elStatusText  = $("#statusText");
+// rate/status
+const elRateBanner = $("#rateBanner");
+const elRateBannerText = $("#rateBannerText");
+const elRateAutoResend = $("#rateAutoResend");
+const elStatusLine = $("#statusLine");
+const elStatusText = $("#statusText");
 
 // metrics
-const elMetricsBucket  = $("#metricsBucket");
+const elMetricsBucket = $("#metricsBucket");
 const elMReq = $("#mReq");
-const elMOk  = $("#mOk");
-const elMRl  = $("#mRl");
+const elMOk = $("#mOk");
+const elMRl = $("#mRl");
 const elMErr = $("#mErr");
 const elMetricsUpdated = $("#metricsUpdated");
 
@@ -59,27 +59,27 @@ let activeId = (threads[0] && threads[0].id) || null;
 
 let isSending = false;
 let rateLocked = false;
-let bannerTimer = null;
-let currentAbort = null;
+let rateTimer = null;
 
-// When we already added the user's message but couldn't get a reply yet,
-// we keep a pending call so we can retry without duplicating the user message.
-let pendingCall = null; // { text: string, threadId: string, tries: number }
+let retryTimer = null;
+let retryRemain = 0;
+let retryAttemptsLeft = 0;
+let retryPayload = null;
+
+let currentAbort = null;
 
 function getActiveThread() {
   return threads.find(t => t.id === activeId) || null;
 }
 
-// ===== Utils =====
 function escapeHtml(s) {
-  return (s ?? "").toString()
+  return String(s ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll("'", "&#039;");
 }
-
 function nl2br(s) {
   return escapeHtml(s).replace(/\n/g, "<br>");
 }
@@ -88,154 +88,87 @@ function scrollChatToBottom() {
   elChat.scrollTop = elChat.scrollHeight;
 }
 
+// ===== UI state =====
 function updateComposerState() {
   const disabled = isSending || rateLocked;
-  elSendBtn.disabled = disabled;
-  elInput.disabled = disabled;
-  elSendBtn.classList.toggle("is-loading", isSending);
+  if (elSendBtn) elSendBtn.disabled = disabled;
+  if (elInput) elInput.disabled = disabled;
+  if (elSendBtn) elSendBtn.classList.toggle("is-loading", isSending);
 }
-
 function setSending(v) {
-  isSending = !!v;
-  refreshMetrics();
-updateComposerState();
-  if (isSending) {
-    setStatus("接続中…");
-  } else {
-    // hide when not sending (banner handles rate-limit / retry messaging)
-    if (!rateLocked) setStatus("");
-  }
+  isSending = v;
+  updateComposerState();
 }
-
-function stopInFlight() {
-  try { currentAbort?.abort(); } catch {}
-  currentAbort = null;
-}
-
-function setStatus(text) {
-  if (!elStatusLine) return;
-  const t = (text || "").trim();
-  if (!t) {
-    elStatusLine.hidden = true;
-    if (elStatusText) elStatusText.textContent = "";
-    return;
-  }
-  elStatusLine.hidden = false;
-  if (elStatusText) elStatusText.textContent = t;
-  else elStatusLine.textContent = t;
-}
-
 
 // ===== Metrics =====
-async function fetchMetrics() {
+async function refreshMetricsOnce() {
+  if (!elMetricsBucket) return;
   try {
     const res = await fetch(METRICS_URL, { method: "GET" });
-    if (!res.ok) return null;
-    return await res.json();
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data?.current) return;
+
+    elMetricsBucket.textContent = data.bucket ?? "-";
+    elMReq.textContent = String(data.current.req ?? 0);
+    elMOk.textContent  = String(data.current.ok ?? 0);
+    elMRl.textContent  = String(data.current.rl ?? 0);
+    elMErr.textContent = String(data.current.err ?? 0);
+    elMetricsUpdated.textContent = data.updated_at ? new Date(data.updated_at).toLocaleString() : "-";
   } catch {
-    return null;
+    // ignore
   }
 }
-
-function renderMetrics(data) {
-  if (!data) return;
-  if (elMetricsBucket) elMetricsBucket.textContent = data.bucket ? data.bucket : "-";
-  if (elMReq) elMReq.textContent = String(data.current?.req ?? 0);
-  if (elMOk)  elMOk.textContent  = String(data.current?.ok  ?? 0);
-  if (elMRl)  elMRl.textContent  = String(data.current?.rl  ?? 0);
-  if (elMErr) elMErr.textContent = String(data.current?.err ?? 0);
-
-  if (elMetricsUpdated) {
-    const t = data.updated_at ? new Date(data.updated_at) : null;
-    elMetricsUpdated.textContent = t ? `更新: ${t.toLocaleString()}` : "更新: -";
-  }
+function startMetricsPolling() {
+  refreshMetricsOnce();
+  setInterval(refreshMetricsOnce, 10000);
 }
 
-async function refreshMetrics() {
-  const data = await fetchMetrics();
-  if (data) renderMetrics(data);
+// ===== Rate limit banner =====
+function hideRateBanner() {
+  if (!elRateBanner) return;
+  elRateBanner.hidden = true;
+  if (elRateBannerText) elRateBannerText.textContent = "";
+  if (rateTimer) { clearInterval(rateTimer); rateTimer = null; }
 }
 
-// Poll every 10s (lightweight)
-setInterval(refreshMetrics, 10_000);
+function showRateBanner(seconds) {
+  if (!elRateBanner) return;
 
-function clearBanner() {
-  if (!elBanner) return;
-  elBanner.hidden = true;
-  elBanner.classList.remove("banner--warn");
-  if (elBannerText) elBannerText.textContent = "";
-  if (bannerTimer) clearInterval(bannerTimer);
-  bannerTimer = null;
-}
+  // stop any in-flight request
+  try { currentAbort?.abort(); } catch {}
 
-function showBanner({ mode, seconds, message }) {
-  if (!elBanner) return;
-
-  // mode: "rate" | "retry"
-  clearBanner();
-  setStatus("");
-
-  // rate lock during countdown
   rateLocked = true;
-  refreshMetrics();
-updateComposerState();
+  updateComposerState();
 
-  // stop in-flight to prevent late replies showing up during cooldown
-  stopInFlight();
-  if (mode !== "retry") setStatus("");
+  if (rateTimer) { clearInterval(rateTimer); rateTimer = null; }
 
-  let remain = Math.max(0, Number(seconds || 0));
-  elBanner.hidden = false;
-
-  if (mode === "retry") elBanner.classList.add("banner--warn");
+  let remain = Math.max(0, Number(seconds || 20));
+  elRateBanner.hidden = false;
 
   const render = () => {
-    const prefix = (mode === "retry")
-      ? "一時的に混雑/通信エラーの可能性があります。"
-      : "アクセスが多すぎます。";
-    const suffix = (mode === "retry")
-      ? ` ${remain}秒後に再試行します。`
-      : ` ${remain}秒待ってから再試行してください。`;
-
-    if (elBannerText) elBannerText.textContent = message || (prefix + suffix);
-    else elBanner.textContent = message || (prefix + suffix);
-
-    // small status line: show only for retry countdown
-    if (mode === "retry") {
-      setStatus(`再試行まで ${remain}秒…`);
+    if (elRateBannerText) {
+      elRateBannerText.textContent = `アクセスが多すぎます。${remain}秒待ってから再試行してください。`;
     }
   };
-
   render();
 
-  bannerTimer = setInterval(() => {
+  rateTimer = setInterval(() => {
     remain -= 1;
     if (remain <= 0) {
-      clearInterval(bannerTimer);
-      bannerTimer = null;
-
+      clearInterval(rateTimer);
+      rateTimer = null;
       rateLocked = false;
-      refreshMetrics();
-updateComposerState();
-      clearBanner();
-  setStatus("");
-      setStatus("");
-      elInput.focus();
+      updateComposerState();
+      hideRateBanner();
 
-      // Auto action at the end of countdown
-      if (pendingCall) {
-        if (mode === "rate") {
-          if (elAutoResend?.checked) {
-            // retry the same call (do NOT add user message again)
-            void performApiCall(pendingCall);
-          } else {
-            // user chose not to resend
-            pendingCall = null;
-          }
-        } else if (mode === "retry") {
-          // retry automatically (limited inside performApiCall)
-          void performApiCall(pendingCall);
-        }
+      // auto resend if enabled and we have a payload to resend
+      const autoResend = !!elRateAutoResend?.checked;
+      if (autoResend && retryPayload) {
+        // resend the last payload (without adding user message again)
+        resendPayload(retryPayload);
+      } else {
+        elInput?.focus();
       }
       return;
     }
@@ -243,7 +176,19 @@ updateComposerState();
   }, 1000);
 }
 
-// ===== Render =====
+// ===== Status line (connecting / retry) =====
+function setStatus(text) {
+  if (!elStatusLine || !elStatusText) return;
+  if (!text) {
+    elStatusLine.hidden = true;
+    elStatusText.textContent = "";
+    return;
+  }
+  elStatusLine.hidden = false;
+  elStatusText.textContent = text;
+}
+
+// ===== Thread rendering =====
 function renderThreadList() {
   elThreadList.innerHTML = "";
   for (const t of threads) {
@@ -279,16 +224,14 @@ function renderChat() {
     bubble.innerHTML = nl2br(m.content || "");
 
     if (Array.isArray(m.sources) && m.sources.length) {
+      const src = document.createElement("div");
+      src.className = "sources";
       const items = m.sources.map(s => {
         const title = s.title ? s.title : s.id;
         const score = (s.score === null || s.score === undefined) ? "" : `（score ${Number(s.score).toFixed(3)}）`;
         return `・${escapeHtml(title)} ${escapeHtml(score)}`;
       }).join("<br>");
-      const src = document.createElement("div");
-      src.style.marginTop = "10px";
-      src.style.color = "var(--muted)";
-      src.style.fontSize = "12px";
-      src.innerHTML = `<div style="margin-bottom:6px; font-weight:700; color:var(--text)">【参照】</div>${items}`;
+      src.innerHTML = `<div style="margin-top:10px; color:var(--muted); font-size:12px;"><div style="margin-bottom:6px; font-weight:700; color:var(--text)">【参照】</div>${items}</div>`;
       bubble.appendChild(src);
     }
 
@@ -312,27 +255,42 @@ function renderChat() {
 }
 
 function renderAll() {
+  renderThreadList();
+  renderChat();
+}
+
+// ===== Message state =====
+function ensureActiveThread() {
   if (!activeId) {
     const t = newThread();
     threads.unshift(t);
     activeId = t.id;
     saveThreads(threads);
   }
-  renderThreadList();
-  renderChat();
+  return getActiveThread();
+}
+
+function addMessage(role, content, sources) {
+  const t = ensureActiveThread();
+  t.messages = t.messages || [];
+  t.messages.push({ role, content, sources: sources || null });
+  t.updatedAt = nowIso();
+
+  // title heuristic: first user message becomes full title
+  if (role === "user" && (!t.title || t.title === "新しいチャット")) {
+    t.title = (content || "").trim() || "新しいチャット";
+  }
+
+  saveThreads(threads);
+  renderAll();
 }
 
 // ===== API =====
-function buildHistoryForApi(t, maxTurns = 10) {
-  const msgs = (t.messages || []).slice(-maxTurns);
-  return msgs.map(m => ({ role: m.role, content: m.content }));
-}
-
 async function callApi(message, threadId, history) {
   const body = { message, thread_id: threadId, history: history || [] };
 
-  // cancel previous in-flight
-  stopInFlight();
+  // abort previous request
+  try { currentAbort?.abort(); } catch {}
   currentAbort = new AbortController();
 
   const res = await fetch(API_URL, {
@@ -356,152 +314,171 @@ async function callApi(message, threadId, history) {
   return data;
 }
 
-// ===== Actions =====
-function addMessage(role, content, sources) {
-  const t = getActiveThread();
-  if (!t) return;
-
-  t.messages = t.messages || [];
-  t.messages.push({ role, content, sources: sources || null });
-  t.updatedAt = nowIso();
-
-  if (role === "user" && (!t.title || t.title === "新しいチャット")) {
-    t.title = (content || "").trim() || "新しいチャット";
-  }
-
-  saveThreads(threads);
-  renderAll();
+// ===== Retry handling =====
+function clearRetry() {
+  if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+  retryRemain = 0;
+  retryAttemptsLeft = 0;
+  retryPayload = null;
+  setStatus("");
 }
 
-function isTransientStatus(status) {
-  return [502, 503, 504, 520, 522, 524].includes(Number(status));
+function scheduleRetry(payload, seconds, attemptsLeft) {
+  // payload is: { threadId, message, history }
+  retryPayload = payload;
+  retryRemain = seconds;
+  retryAttemptsLeft = attemptsLeft;
+
+  setStatus(`再試行まで ${retryRemain}秒…`);
+
+  if (retryTimer) clearInterval(retryTimer);
+  retryTimer = setInterval(() => {
+    retryRemain -= 1;
+    if (retryRemain <= 0) {
+      clearInterval(retryTimer);
+      retryTimer = null;
+      setStatus("再試行中…");
+      resendPayload(payload);
+      return;
+    }
+    setStatus(`再試行まで ${retryRemain}秒…`);
+  }, 1000);
 }
 
-async function performApiCall(call) {
+async function resendPayload(payload) {
+  if (!payload) return;
   const t = getActiveThread();
-  if (!t) return;
-
-  // If user switched threads, do nothing.
-  if (call.threadId !== t.id) {
-    pendingCall = null;
-    return;
-  }
-
-  const tries = Number(call.tries || 0);
-  pendingCall = { ...call, tries };
-
-  setSending(true);
+  const threadId = payload.threadId || t?.id;
 
   try {
-    const history = buildHistoryForApi(t, 10);
-    const result = await callApi(call.text, t.id, history);
+    setSending(true);
+    setStatus("接続中…");
+    const data = await callApi(payload.message, threadId, payload.history);
+    setStatus("");
+    clearRetry();
 
-    const reply = String(result?.reply ?? "").trim();
-    const sources = Array.isArray(result?.sources) ? result.sources : [];
-
-    pendingCall = null;
-
-    if (reply) addMessage("assistant", reply, sources);
-    else addMessage("assistant", "（応答が空でした）", sources);
+    // add assistant response
+    addMessage("assistant", data.reply || "（応答が空です）", data.sources || null);
   } catch (e) {
     if (e?.name === "AbortError") {
-      // aborted (e.g. user sent another message / cooldown)
+      // ignore
     } else if (e?.status === 429) {
+      // rate limit -> show banner and let banner decide resend
       const retry = Number(e?.data?.retry_after ?? 20);
-      // keep pendingCall, show rate banner
-      showBanner({ mode: "rate", seconds: retry });
-    } else if (isTransientStatus(e?.status) || e?.message?.includes("Failed to fetch")) {
-      // limited retries to avoid infinite loops
-      const nextTries = tries + 1;
-      if (nextTries >= 3) {
-        const msg = (e && e.message) ? e.message : String(e);
-        addMessage("assistant", `エラー：${msg}`);
-        pendingCall = null;
-      } else {
-        pendingCall = { ...call, tries: nextTries };
-        showBanner({ mode: "retry", seconds: 3 });
-      }
+      showRateBanner(retry);
+    } else if (TRANSIENT_STATUS.has(Number(e?.status)) && retryAttemptsLeft > 0) {
+      // schedule another retry
+      scheduleRetry(payload, 3, retryAttemptsLeft - 1);
     } else {
-      const msg = (e && e.message) ? e.message : String(e);
-      addMessage("assistant", `エラー：${msg}`);
-      pendingCall = null;
+      setStatus("");
+      clearRetry();
+      addMessage("assistant", `エラー：${e?.message || e}`);
     }
   } finally {
     setSending(false);
-    if (!rateLocked) elInput.focus();
+    if (!rateLocked) elInput?.focus();
   }
 }
 
+// ===== Send message =====
 async function sendMessage() {
-  const t = getActiveThread();
-  if (!t) return;
+  if (rateLocked) return;
 
-  if (rateLocked || isSending) return;
-
+  const t = ensureActiveThread();
   const text = (elInput.value || "").trim();
   if (!text) return;
 
-  // Clear UI input (message is stored in history)
+  // reset transient retry state for this new message
+  clearRetry();
+
+  // build history (simple: last 6 messages)
+  const history = (t.messages || []).slice(-6).map(m => ({ role: m.role, content: m.content }));
+
+  // add user message immediately
+  addMessage("user", text);
+
   elInput.value = "";
   elInput.style.height = "auto";
 
-  // Add user message once
-  addMessage("user", text);
+  const payload = { threadId: t.id, message: text, history };
 
-  // Prepare pending call and execute
-  pendingCall = { text, threadId: t.id, tries: 0 };
-  await performApiCall(pendingCall);
+  try {
+    setSending(true);
+    setStatus("接続中…");
+    const data = await callApi(text, t.id, history);
+    setStatus("");
+    // add assistant response
+    addMessage("assistant", data.reply || "（応答が空です）", data.sources || null);
+  } catch (e) {
+    if (e?.name === "AbortError") {
+      // ignore
+    } else if (e?.status === 429) {
+      const retry = Number(e?.data?.retry_after ?? 20);
+      // store payload for potential auto resend
+      retryPayload = payload;
+      showRateBanner(retry);
+    } else if (TRANSIENT_STATUS.has(Number(e?.status))) {
+      // schedule up to 2 retries
+      scheduleRetry(payload, 3, 2);
+    } else {
+      setStatus("");
+      addMessage("assistant", `エラー：${e?.message || e}`);
+    }
+  } finally {
+    setSending(false);
+    if (!rateLocked) elInput?.focus();
+  }
 }
 
-function clearActiveThread() {
-  if (!activeId) return;
-  threads = threads.filter(t => t.id !== activeId);
-  activeId = (threads[0] && threads[0].id) || null;
-  saveThreads(threads);
-  pendingCall = null;
-  clearBanner();
-  setStatus("");
-  rateLocked = false;
-  setSending(false);
-  renderAll();
+// ===== Events =====
+function autosizeTextarea() {
+  elInput.style.height = "auto";
+  elInput.style.height = Math.min(elInput.scrollHeight, 220) + "px";
 }
 
-function createNewThreadAndSelect() {
+elInput?.addEventListener("input", autosizeTextarea);
+
+elInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+elSendBtn?.addEventListener("click", () => sendMessage());
+
+elNewChatBtn?.addEventListener("click", () => {
   const t = newThread();
   threads.unshift(t);
   activeId = t.id;
   saveThreads(threads);
-  pendingCall = null;
-  clearBanner();
-  setStatus("");
-  rateLocked = false;
-  setSending(false);
+  hideRateBanner();
+  clearRetry();
   renderAll();
-  elInput.focus();
-}
+  elInput?.focus();
+});
 
-// ===== Events =====
-elNewChatBtn.addEventListener("click", createNewThreadAndSelect);
-elClearBtn.addEventListener("click", clearActiveThread);
-elSendBtn.addEventListener("click", sendMessage);
+elClearBtn?.addEventListener("click", () => {
+  const t = getActiveThread();
+  if (!t) return;
+  t.messages = [];
+  t.title = "新しいチャット";
+  t.updatedAt = nowIso();
+  saveThreads(threads);
+  hideRateBanner();
+  clearRetry();
+  renderAll();
+});
 
-elInput.addEventListener("keydown", (e) => {
-  if (rateLocked || isSending) return;
-
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    void sendMessage();
+// ===== Init =====
+(function init() {
+  if (!threads.length) {
+    const t = newThread();
+    threads = [t];
+    activeId = t.id;
+    saveThreads(threads);
   }
-});
-
-// Auto-grow textarea (simple)
-elInput.addEventListener("input", () => {
-  elInput.style.height = "auto";
-  elInput.style.height = Math.min(elInput.scrollHeight, 180) + "px";
-});
-
-// ===== Boot =====
-if (!activeId) createNewThreadAndSelect();
-else renderAll();
-refreshMetrics();
-updateComposerState();
+  renderAll();
+  startMetricsPolling();
+  elInput?.focus();
+})();
