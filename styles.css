@@ -449,3 +449,32 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* Download format menu */
+.menu-popup{
+  position: absolute;
+  top: 44px;
+  right: 0;
+  min-width: 150px;
+  background: rgba(12,18,28,.96);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.42);
+  z-index: 2000;
+}
+.menu-popup .menu-item{
+  width: 100%;
+  text-align: left;
+  padding: 10px 10px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+.menu-popup .menu-item:hover{
+  background: rgba(255,255,255,.08);
+}
+.topbar-actions{ position: relative; }
