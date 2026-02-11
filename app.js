@@ -650,3 +650,37 @@ elClearBtn?.addEventListener("click", () => {
 startMetricsPolling();
   elInput?.focus();
 })();
+
+
+function bindTopbarActions(){
+  const copyBtn = document.getElementById("copyBtn");
+  const dlBtn = document.getElementById("downloadBtn");
+  const clearBtn = document.getElementById("clearBtn");
+
+  copyBtn?.addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    const t = getActiveThread?.() || null;
+    if (!t) return;
+    const md = exportThreadMarkdown(t);
+    const ok = await copyToClipboard(md);
+    if (!ok) showCopyModal(md);
+  });
+
+  dlBtn?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    const t = getActiveThread?.() || null;
+    if (!t) return;
+    const safeTitle = (t.title || "chat").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadJsonFile(`ytec_${safeTitle}_${stamp}.json`, t);
+  });
+
+  clearBtn?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    clearActiveThread?.();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  bindTopbarActions();
+});
