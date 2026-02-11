@@ -309,7 +309,7 @@ function renderChat() {
       bubble.appendChild(src);
     }
 
-    row.appendChild(avatar);
+    if (!isUser) row.appendChild(avatar);
     row.appendChild(bubble);
     elChat.appendChild(row);
   }
@@ -373,7 +373,7 @@ function addMessage(role, content, sources) {
   t.updatedAt = nowIso();
 
   if (role === "user" && (!t.title || t.title === "新しいチャット")) {
-    t.title = (content || "").slice(0, 18).trim() || "新しいチャット";
+    t.title = (content || "").trim() || "新しいチャット";
   }
 
   saveThreads(threads);
