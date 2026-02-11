@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=5" />
 </head>
 <body>
   <div class="app">
@@ -22,11 +22,16 @@
 
       <button id="newChatBtn" class="btn btn-ghost">＋ 新しいチャット</button>
 
-      <div class="section-title">接続先</div>
+      
+      <button id="toggleApiConfigBtn" class="btn btn-ghost btn-small" type="button" hidden>接続先設定</button>
+      <div id="apiConfigWrap" hidden>
+<div class="section-title">接続先</div>
       <div class="api-config">
         <input id="apiUrlInput" class="input" type="url" spellcheck="false" />
         <button id="saveApiUrlBtn" class="btn btn-ghost">保存</button>
         <div class="api-hint">※ /chat が 405 のときは Workers のURL（…workers.dev/chat）を入れてください</div>
+      </div>
+
       </div>
 
 
@@ -80,6 +85,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=23"></script>
+  <script src="./app.js?v=24"></script>
 </body>
 </html>
