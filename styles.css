@@ -232,3 +232,54 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   0%,100%{ transform: scale(.75); opacity:.35; }
   50%{ transform: scale(1); opacity:.85; }
 }
+
+
+/* ===== Metrics mini panel ===== */
+.metrics{
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(15,22,34,.35);
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.metrics-row{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+}
+.metrics-label{
+  font-size:12px;
+  color:var(--muted);
+}
+.metrics-value{
+  font-size:12px;
+  color:var(--muted);
+}
+.metrics-grid{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:10px;
+}
+.metrics-item{
+  border:1px solid var(--border);
+  border-radius: 12px;
+  padding:8px 10px;
+  background: rgba(12,18,28,.55);
+}
+.metrics-item .k{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:.2px;
+}
+.metrics-item .v{
+  margin-top:4px;
+  font-size:16px;
+  font-weight:700;
+}
+.metrics-foot{
+  font-size:11px;
+  color:var(--muted);
+}
