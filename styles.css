@@ -296,3 +296,29 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
 
 /* Composer row */
 .composer-row{ display:flex; gap:10px; align-items:flex-end; }
+
+
+/* ===== Composer sizing fix (keep full-width input) ===== */
+.composer{
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+.composer-row{
+  width: 100%;
+}
+.composer-row textarea#input{
+  flex: 1 1 auto;
+  width: auto; /* override generic textarea width:100% inside flex */
+  min-height: 46px;
+  font-size: 14px;
+}
+#sendBtn{
+  min-height: 46px;
+  min-width: 90px;
+}
+
+/* Footer centered */
+.footer-note{
+  text-align: center;
+  width: 100%;
+}
