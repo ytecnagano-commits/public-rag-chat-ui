@@ -1,10 +1,19 @@
 // ===== Config =====
-const API_URL = new URL("/chat", location.origin).href;
-const METRICS_URL = new URL("/metrics", location.origin).href;
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
 // Transient errors that are worth retrying
 const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 522, 524]);
+
+// API endpoint (configurable)
+const DEFAULT_API_URL = new URL("/chat", location.origin).href;
+const LS_API_URL = "public_rag_api_url";
+let API_URL = localStorage.getItem(LS_API_URL) || DEFAULT_API_URL;
+let METRICS_URL = API_URL.replace(/\/chat$/, "/metrics");
+function setApiUrl(url){
+  API_URL = url;
+  METRICS_URL = API_URL.replace(/\/chat$/, "/metrics");
+  localStorage.setItem(LS_API_URL, API_URL);
+}
 
 // ===== Storage =====
 const LS_KEY = "public_rag_chat_threads_v2";
@@ -37,6 +46,9 @@ const elThreadTitle = $("#threadTitle");
 const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
+
+const elApiUrlInput = $("#apiUrlInput");
+const elSaveApiUrlBtn = $("#saveApiUrlBtn");
 
 // rate/status
 const elRateBanner = $("#rateBanner");
@@ -305,7 +317,8 @@ async function callApi(message, threadId, history) {
   catch { data = { reply: await res.text().catch(() => "") }; }
 
   if (!res.ok) {
-    const msg = data?.reply || `HTTP ${res.status}`;
+    let msg = data?.reply || `HTTP ${res.status}`;
+    if (res.status === 405) msg = "HTTP 405（POSTが許可されていません）: 接続先URLを Workers の /chat に変更してください";
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
@@ -479,6 +492,17 @@ elClearBtn?.addEventListener("click", () => {
     saveThreads(threads);
   }
   renderAll();
-  startMetricsPolling();
+
+  // init API URL input
+  if (elApiUrlInput) elApiUrlInput.value = API_URL;
+  elSaveApiUrlBtn?.addEventListener("click", () => {
+    const v = (elApiUrlInput?.value || "").trim();
+    if (!v) return;
+    setApiUrl(v);
+    // refresh metrics immediately on change
+    refreshMetricsOnce();
+  });
+
+startMetricsPolling();
   elInput?.focus();
 })();
