@@ -32,17 +32,24 @@ const elThreadTitle = $("#threadTitle");
 const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
-const elRateBanner  = $("#rateBanner");
+
+// banner
+const elBanner       = $("#rateBanner");
+const elBannerText   = $("#rateBannerText");
+const elAutoResend   = $("#rateAutoResend");
 
 // ===== State =====
 let threads = loadThreads();
 let activeId = (threads[0] && threads[0].id) || null;
 
-// sending / rate limit state
 let isSending = false;
 let rateLocked = false;
-let rateTimer = null;
+let bannerTimer = null;
 let currentAbort = null;
+
+// When we already added the user's message but couldn't get a reply yet,
+// we keep a pending call so we can retry without duplicating the user message.
+let pendingCall = null; // { text: string, threadId: string, tries: number }
 
 function getActiveThread() {
   return threads.find(t => t.id === activeId) || null;
@@ -63,7 +70,6 @@ function nl2br(s) {
 }
 
 function scrollChatToBottom() {
-  // chat is a section; scroll within page
   elChat.scrollTop = elChat.scrollHeight;
 }
 
@@ -79,36 +85,78 @@ function setSending(v) {
   updateComposerState();
 }
 
-function showRateBanner(seconds) {
-  if (!elRateBanner) return;
+function stopInFlight() {
+  try { currentAbort?.abort(); } catch {}
+  currentAbort = null;
+}
 
-  // lock composer
+function clearBanner() {
+  if (!elBanner) return;
+  elBanner.hidden = true;
+  elBanner.classList.remove("banner--warn");
+  if (elBannerText) elBannerText.textContent = "";
+  if (bannerTimer) clearInterval(bannerTimer);
+  bannerTimer = null;
+}
+
+function showBanner({ mode, seconds, message }) {
+  if (!elBanner) return;
+
+  // mode: "rate" | "retry"
+  clearBanner();
+
+  // rate lock during countdown
   rateLocked = true;
   updateComposerState();
 
-  // stop in-flight request (prevents late replies during cooldown)
-  try { currentAbort?.abort(); } catch {}
+  // stop in-flight to prevent late replies showing up during cooldown
+  stopInFlight();
 
-  if (rateTimer) clearInterval(rateTimer);
+  let remain = Math.max(0, Number(seconds || 0));
+  elBanner.hidden = false;
 
-  let remain = Math.max(0, Number(seconds || 20));
-  elRateBanner.hidden = false;
+  if (mode === "retry") elBanner.classList.add("banner--warn");
 
   const render = () => {
-    elRateBanner.textContent = `アクセスが多すぎます。${remain}秒待ってから再試行してください。`;
+    const prefix = (mode === "retry")
+      ? "一時的に混雑/通信エラーの可能性があります。"
+      : "アクセスが多すぎます。";
+    const suffix = (mode === "retry")
+      ? ` ${remain}秒後に再試行します。`
+      : ` ${remain}秒待ってから再試行してください。`;
+
+    if (elBannerText) elBannerText.textContent = message || (prefix + suffix);
+    else elBanner.textContent = message || (prefix + suffix);
   };
+
   render();
 
-  rateTimer = setInterval(() => {
+  bannerTimer = setInterval(() => {
     remain -= 1;
     if (remain <= 0) {
-      clearInterval(rateTimer);
-      rateTimer = null;
-      elRateBanner.hidden = true;
-      elRateBanner.textContent = "";
+      clearInterval(bannerTimer);
+      bannerTimer = null;
+
       rateLocked = false;
       updateComposerState();
+      clearBanner();
       elInput.focus();
+
+      // Auto action at the end of countdown
+      if (pendingCall) {
+        if (mode === "rate") {
+          if (elAutoResend?.checked) {
+            // retry the same call (do NOT add user message again)
+            void performApiCall(pendingCall);
+          } else {
+            // user chose not to resend
+            pendingCall = null;
+          }
+        } else if (mode === "retry") {
+          // retry automatically (limited inside performApiCall)
+          void performApiCall(pendingCall);
+        }
+      }
       return;
     }
     render();
@@ -120,7 +168,7 @@ function renderThreadList() {
   elThreadList.innerHTML = "";
   for (const t of threads) {
     const btn = document.createElement("button");
-    btn.className = "thread-item" + (t.id === activeId ? " active" : "");
+    btn.className = "thread" + (t.id === activeId ? " active" : "");
     btn.type = "button";
     btn.innerHTML = `
       <div class="thread-title">${escapeHtml(t.title || "（無題）")}</div>
@@ -137,45 +185,35 @@ function renderThreadList() {
 function renderChat() {
   const t = getActiveThread();
   elChat.innerHTML = "";
-
   if (!t) return;
 
   for (const m of (t.messages || [])) {
-    const row = document.createElement("div");
-    row.className = "msg-row " + (m.role === "user" ? "user" : "assistant");
+    const box = document.createElement("div");
+    box.className = "msg " + (m.role === "user" ? "user" : "assistant");
+    box.innerHTML = nl2br(m.content || "");
 
-    const bubble = document.createElement("div");
-    bubble.className = "msg-bubble";
-
-    // main content
-    bubble.innerHTML = nl2br(m.content || "");
-
-    // sources (optional)
     if (Array.isArray(m.sources) && m.sources.length) {
-      const src = document.createElement("div");
-      src.className = "sources";
       const items = m.sources.map(s => {
         const title = s.title ? s.title : s.id;
         const score = (s.score === null || s.score === undefined) ? "" : `（score ${Number(s.score).toFixed(3)}）`;
         return `・${escapeHtml(title)} ${escapeHtml(score)}`;
       }).join("<br>");
-      src.innerHTML = `<div class="sources-title">【参照】</div>${items}`;
-      bubble.appendChild(src);
+      const src = document.createElement("div");
+      src.style.marginTop = "10px";
+      src.style.color = "var(--muted)";
+      src.style.fontSize = "12px";
+      src.innerHTML = `<div style="margin-bottom:6px; font-weight:700; color:var(--text)">【参照】</div>${items}`;
+      box.appendChild(src);
     }
 
-    row.appendChild(bubble);
-    elChat.appendChild(row);
+    elChat.appendChild(box);
   }
 
-  // update title
   elThreadTitle.textContent = t.title || "新しいチャット";
-
-  // scroll
   scrollChatToBottom();
 }
 
 function renderAll() {
-  // ensure active
   if (!activeId) {
     const t = newThread();
     threads.unshift(t);
@@ -187,33 +225,28 @@ function renderAll() {
 }
 
 // ===== API =====
-function buildHistoryForApi(t, maxTurns = 8) {
+function buildHistoryForApi(t, maxTurns = 10) {
   const msgs = (t.messages || []).slice(-maxTurns);
-  // Convert to OpenAI-style chat history (role/content)
   return msgs.map(m => ({ role: m.role, content: m.content }));
 }
 
 async function callApi(message, threadId, history) {
-  const body = {
-    message,
-    thread_id: threadId,
-    history: history || []
-  };
+  const body = { message, thread_id: threadId, history: history || [] };
 
-  // Abort previous request if any
-  try { currentAbort?.abort(); } catch {}
+  // cancel previous in-flight
+  stopInFlight();
   currentAbort = new AbortController();
 
   const res = await fetch(API_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: currentAbort.signal
+    signal: currentAbort.signal,
   });
 
-  // Try to parse JSON always
   let data = null;
-  try { data = await res.json(); } catch { data = { reply: await res.text().catch(() => "") }; }
+  try { data = await res.json(); }
+  catch { data = { reply: await res.text().catch(() => "") }; }
 
   if (!res.ok) {
     const msg = data?.reply || `HTTP ${res.status}`;
@@ -226,7 +259,6 @@ async function callApi(message, threadId, history) {
 }
 
 // ===== Actions =====
-
 function addMessage(role, content, sources) {
   const t = getActiveThread();
   if (!t) return;
@@ -235,7 +267,6 @@ function addMessage(role, content, sources) {
   t.messages.push({ role, content, sources: sources || null });
   t.updatedAt = nowIso();
 
-  // title heuristic: first user message becomes title
   if (role === "user" && (!t.title || t.title === "新しいチャット")) {
     t.title = (content || "").slice(0, 18).trim() || "新しいチャット";
   }
@@ -244,38 +275,58 @@ function addMessage(role, content, sources) {
   renderAll();
 }
 
-async function sendMessage() {
+function isTransientStatus(status) {
+  return [502, 503, 504, 520, 522, 524].includes(Number(status));
+}
+
+async function performApiCall(call) {
   const t = getActiveThread();
   if (!t) return;
 
-  // During cooldown, do nothing
-  if (rateLocked) return;
+  // If user switched threads, do nothing.
+  if (call.threadId !== t.id) {
+    pendingCall = null;
+    return;
+  }
 
-  const text = (elInput.value || "").trim();
-  if (!text) return;
-
-  elInput.value = "";
-  addMessage("user", text);
+  const tries = Number(call.tries || 0);
+  pendingCall = { ...call, tries };
 
   setSending(true);
+
   try {
     const history = buildHistoryForApi(t, 10);
-    const result = await callApi(text, t.id, history);
+    const result = await callApi(call.text, t.id, history);
 
     const reply = String(result?.reply ?? "").trim();
     const sources = Array.isArray(result?.sources) ? result.sources : [];
+
+    pendingCall = null;
 
     if (reply) addMessage("assistant", reply, sources);
     else addMessage("assistant", "（応答が空でした）", sources);
   } catch (e) {
     if (e?.name === "AbortError") {
-      // do nothing
+      // aborted (e.g. user sent another message / cooldown)
     } else if (e?.status === 429) {
       const retry = Number(e?.data?.retry_after ?? 20);
-      showRateBanner(retry);
+      // keep pendingCall, show rate banner
+      showBanner({ mode: "rate", seconds: retry });
+    } else if (isTransientStatus(e?.status) || e?.message?.includes("Failed to fetch")) {
+      // limited retries to avoid infinite loops
+      const nextTries = tries + 1;
+      if (nextTries >= 3) {
+        const msg = (e && e.message) ? e.message : String(e);
+        addMessage("assistant", `エラー：${msg}`);
+        pendingCall = null;
+      } else {
+        pendingCall = { ...call, tries: nextTries };
+        showBanner({ mode: "retry", seconds: 3 });
+      }
     } else {
       const msg = (e && e.message) ? e.message : String(e);
       addMessage("assistant", `エラー：${msg}`);
+      pendingCall = null;
     }
   } finally {
     setSending(false);
@@ -283,11 +334,36 @@ async function sendMessage() {
   }
 }
 
+async function sendMessage() {
+  const t = getActiveThread();
+  if (!t) return;
+
+  if (rateLocked || isSending) return;
+
+  const text = (elInput.value || "").trim();
+  if (!text) return;
+
+  // Clear UI input (message is stored in history)
+  elInput.value = "";
+  elInput.style.height = "auto";
+
+  // Add user message once
+  addMessage("user", text);
+
+  // Prepare pending call and execute
+  pendingCall = { text, threadId: t.id, tries: 0 };
+  await performApiCall(pendingCall);
+}
+
 function clearActiveThread() {
   if (!activeId) return;
   threads = threads.filter(t => t.id !== activeId);
   activeId = (threads[0] && threads[0].id) || null;
   saveThreads(threads);
+  pendingCall = null;
+  clearBanner();
+  rateLocked = false;
+  setSending(false);
   renderAll();
 }
 
@@ -296,6 +372,10 @@ function createNewThreadAndSelect() {
   threads.unshift(t);
   activeId = t.id;
   saveThreads(threads);
+  pendingCall = null;
+  clearBanner();
+  rateLocked = false;
+  setSending(false);
   renderAll();
   elInput.focus();
 }
@@ -306,9 +386,11 @@ elClearBtn.addEventListener("click", clearActiveThread);
 elSendBtn.addEventListener("click", sendMessage);
 
 elInput.addEventListener("keydown", (e) => {
+  if (rateLocked || isSending) return;
+
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    sendMessage();
+    void sendMessage();
   }
 });
 
@@ -321,3 +403,4 @@ elInput.addEventListener("input", () => {
 // ===== Boot =====
 if (!activeId) createNewThreadAndSelect();
 else renderAll();
+updateComposerState();
