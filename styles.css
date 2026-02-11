@@ -367,3 +367,8 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   overflow: visible !important;
   text-overflow: clip !important;
 }
+
+
+/* grid内スクロールが崩れてtopbar/sidebarが押し出されるのを防ぐ */
+.main { min-height: 0; }
+.chat { min-height: 0; }
