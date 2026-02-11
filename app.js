@@ -1,5 +1,6 @@
 // ===== Config =====
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
+const METRICS_URL = API_URL.replace(/\/chat\b/, "/metrics");
 
 // ===== Storage =====
 const LS_KEY = "public_rag_chat_threads_v1";
@@ -41,6 +42,14 @@ const elAutoResend   = $("#rateAutoResend");
 // status
 const elStatusLine  = $("#statusLine");
 const elStatusText  = $("#statusText");
+
+// metrics
+const elMetricsBucket  = $("#metricsBucket");
+const elMReq = $("#mReq");
+const elMOk  = $("#mOk");
+const elMRl  = $("#mRl");
+const elMErr = $("#mErr");
+const elMetricsUpdated = $("#metricsUpdated");
 
 // ===== State =====
 let threads = loadThreads();
@@ -86,7 +95,8 @@ function updateComposerState() {
 
 function setSending(v) {
   isSending = !!v;
-  updateComposerState();
+  refreshMetrics();
+updateComposerState();
   if (isSending) {
     setStatus("接続中…");
   } else {
@@ -113,6 +123,40 @@ function setStatus(text) {
   else elStatusLine.textContent = t;
 }
 
+
+// ===== Metrics =====
+async function fetchMetrics() {
+  try {
+    const res = await fetch(METRICS_URL, { method: "GET" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function renderMetrics(data) {
+  if (!data) return;
+  if (elMetricsBucket) elMetricsBucket.textContent = data.bucket ? data.bucket : "-";
+  if (elMReq) elMReq.textContent = String(data.current?.req ?? 0);
+  if (elMOk)  elMOk.textContent  = String(data.current?.ok  ?? 0);
+  if (elMRl)  elMRl.textContent  = String(data.current?.rl  ?? 0);
+  if (elMErr) elMErr.textContent = String(data.current?.err ?? 0);
+
+  if (elMetricsUpdated) {
+    const t = data.updated_at ? new Date(data.updated_at) : null;
+    elMetricsUpdated.textContent = t ? `更新: ${t.toLocaleString()}` : "更新: -";
+  }
+}
+
+async function refreshMetrics() {
+  const data = await fetchMetrics();
+  if (data) renderMetrics(data);
+}
+
+// Poll every 10s (lightweight)
+setInterval(refreshMetrics, 10_000);
+
 function clearBanner() {
   if (!elBanner) return;
   elBanner.hidden = true;
@@ -131,7 +175,8 @@ function showBanner({ mode, seconds, message }) {
 
   // rate lock during countdown
   rateLocked = true;
-  updateComposerState();
+  refreshMetrics();
+updateComposerState();
 
   // stop in-flight to prevent late replies showing up during cooldown
   stopInFlight();
@@ -168,7 +213,8 @@ function showBanner({ mode, seconds, message }) {
       bannerTimer = null;
 
       rateLocked = false;
-      updateComposerState();
+      refreshMetrics();
+updateComposerState();
       clearBanner();
   setStatus("");
       setStatus("");
@@ -437,4 +483,5 @@ elInput.addEventListener("input", () => {
 // ===== Boot =====
 if (!activeId) createNewThreadAndSelect();
 else renderAll();
+refreshMetrics();
 updateComposerState();
