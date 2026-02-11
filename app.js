@@ -720,7 +720,7 @@ function bindTopbarActions(){
       downloadTextFile(`ytec_${safeTitle}_${stamp}.txt`, md);
     } else if (fmt === "csv") {
       const csv = exportThreadCsv(t);
-      downloadTextFile(`ytec_${safeTitle}_${stamp}.csv`, csv);
+      downloadCsvFile(`ytec_${safeTitle}_${stamp}.csv`, csv);
     }
 
     const menu = document.getElementById("downloadMenu");
@@ -739,8 +739,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-function downloadTextFile(filename, text){
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+function downloadTextFile(filename, text, mime = "text/plain;charset=utf-8"){
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -749,6 +749,13 @@ function downloadTextFile(filename, text){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+
+function downloadCsvFile(filename, csvText){
+  // Excel対策：UTF-8 BOM + CRLF
+  const bom = "\ufeff";
+  downloadTextFile(filename, bom + csvText, "text/csv;charset=utf-8");
 }
 
 function csvEscape(v){
@@ -766,7 +773,8 @@ function exportThreadCsv(thread){
     const timeISO = m.time ? new Date(m.time).toISOString() : "";
     rows.push([String(i+1), m.role || "", m.content || "", timeISO]);
   });
-  return rows.map(r => r.map(csvEscape).join(",")).join("\n");
+  return rows.map(r => r.map(csvEscape).join(",")).join("
+");
 }
 
 function getActiveThread(){
