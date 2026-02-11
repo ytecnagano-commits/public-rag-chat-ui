@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=3" />
+  <link rel="stylesheet" href="./styles.css?v=4" />
 </head>
 <body>
   <div class="app">
@@ -57,7 +57,11 @@
     <main class="main">
       <header class="topbar">
         <div id="threadTitle" class="thread-title-top">新しいチャット</div>
-        <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
+        <div class="topbar-actions">
+          <button id="copyBtn" class="btn btn-ghost" title="この会話をMarkdownでコピー">コピー</button>
+          <button id="downloadBtn" class="btn btn-ghost" title="この会話をJSONで保存">DL</button>
+          <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
+        </div>
       </header>
 
       <section id="chat" class="chat"></section>
@@ -83,6 +87,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=3"></script>
+  <script src="./app.js?v=4"></script>
 </body>
 </html>
