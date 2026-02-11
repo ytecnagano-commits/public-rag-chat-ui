@@ -2,17 +2,20 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=1" />
 </head>
 <body>
-  <div class="app">
+  <div class="layout">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-dot"></div>
-        <div>
-          <div class="brand-title">Y-TEC トラブル解決BOT【ワイテッくん】</div>
+        <img class="brand-avatar" src="./bot-avatar.jpg" alt="ワイテッくん" />
+        <div class="brand-text">
+          <div class="brand-title">
+            <div>Y-TEC トラブル解決BOT</div>
+            <div>【ワイテッくん】</div>
+          </div>
           <div class="brand-sub">過去事例を元にトラブル解決をお手伝いします！</div>
         </div>
       </div>
@@ -37,18 +40,13 @@
         <div class="metrics-updated">更新: <span id="metricsUpdated">-</span></div>
       </div>
 
-
-      <div class="footer-note">
-        Copyright (C) 2026- Y-TEC
-      </div>
+      <div class="footer-note">Copyright (C) 2026- Y-TEC</div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div class="topbar-title" id="threadTitle">新しいチャット</div>
-        <div class="topbar-actions">
-          <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
-        </div>
+        <div id="threadTitle" class="thread-title-top">新しいチャット</div>
+        <button id="clearBtn" class="btn btn-ghost">この会話を消す</button>
       </header>
 
       <section id="chat" class="chat"></section>
@@ -74,6 +72,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=10"></script>
+  <script src="./app.js?v=20"></script>
 </body>
 </html>
