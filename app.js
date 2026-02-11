@@ -684,8 +684,16 @@ function bindTopbarActions(){
   dlBtn?.addEventListener("click", (ev) => {
     ev.preventDefault();
     const menu = document.getElementById("downloadMenu");
-    if (!menu) return;
-    // toggle
+    if (!menu) {
+      // フォールバック：メニューが無い場合はJSONをDL
+      const t = getActiveThread?.() || null;
+      if (!t) return;
+      const safeTitle = (t.title || "chat").replace(/[\/:*?"<>|]+/g, "_").slice(0, 80);
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      downloadJsonFile(`ytec_${safeTitle}_${stamp}.json`, t);
+      showToast?.("ダウンロードしました");
+      return;
+    }
     menu.hidden = !menu.hidden;
   });
 
