@@ -652,6 +652,21 @@ startMetricsPolling();
 })();
 
 
+
+
+function showToast(message, ms = 1600){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = message;
+  document.body.appendChild(el);
+  // force reflow then show
+  void el.offsetHeight;
+  el.classList.add("show");
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 300);
+  }, ms);
+}
 function bindTopbarActions(){
   const copyBtn = document.getElementById("copyBtn");
   const dlBtn = document.getElementById("downloadBtn");
@@ -663,7 +678,7 @@ function bindTopbarActions(){
     if (!t) return;
     const md = exportThreadMarkdown(t);
     const ok = await copyToClipboard(md);
-    if (!ok) showCopyModal(md);
+    if (ok) { showToast("コピーしました"); } else { showCopyModal(md); }
   });
 
   dlBtn?.addEventListener("click", (ev) => {
