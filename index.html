@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Public RAG Chat</title>
+  <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -12,8 +12,8 @@
       <div class="brand">
         <div class="brand-dot"></div>
         <div>
-          <div class="brand-title">Public RAG Chat</div>
-          <div class="brand-sub">ChatGPT風UI（静的HTML）</div>
+          <div class="brand-title">Y-TEC トラブル解決BOT【ワイテッくん】</div>
+          <div class="brand-sub">過去事例を元にトラブル解決をお手伝いします！</div>
         </div>
       </div>
 
@@ -22,17 +22,6 @@
       <div class="section-title">履歴（このブラウザ）</div>
       <div id="threadList" class="thread-list"></div>
 
-      <div class="section-title">管理</div>
-      <div id="metricsPanel" class="metrics">
-        <div class="metrics-row"><span class="metrics-label">現在</span><span id="metricsBucket" class="metrics-value">-</span></div>
-        <div class="metrics-grid">
-          <div class="metrics-item"><div class="k">req</div><div id="mReq" class="v">-</div></div>
-          <div class="metrics-item"><div class="k">ok</div><div id="mOk" class="v">-</div></div>
-          <div class="metrics-item"><div class="k">429</div><div id="mRl" class="v">-</div></div>
-          <div class="metrics-item"><div class="k">err</div><div id="mErr" class="v">-</div></div>
-        </div>
-        <div class="metrics-foot"><span id="metricsUpdated">未取得</span></div>
-      </div>
       <div class="footer-note">
         ※ 公開運用ではレート制限の設定を推奨
       </div>
@@ -49,29 +38,12 @@
       <section id="chat" class="chat"></section>
 
       <section class="composer">
-        <div id="rateBanner" class="rate-banner" hidden>
-          <div class="rate-banner__row">
-            <div id="rateBannerText" class="rate-banner__text"></div>
-            <label class="rate-banner__opt">
-              <input type="checkbox" id="rateAutoResend" checked />
-              解除後に自動再送
-            </label>
-          </div>
-        </div>
-
-        <div id="statusLine" class="status-line" hidden>
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="statusText"></span>
-        </div>
-
-        <div class="composer-row">
-          <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
-          <button id="sendBtn" class="btn btn-primary">送信</button>
-        </div>
+        <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
+        <button id="sendBtn" class="btn btn-primary">送信</button>
       </section>
     </main>
   </div>
 
-  <script src="./app.js?v=12"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>
