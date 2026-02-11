@@ -342,3 +342,28 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   background: rgba(47,129,247,.14);
   border-color: rgba(47,129,247,.35);
 }
+
+/* Bot bubble accent */
+.msg-row.assistant .msg-bubble{
+  border-color: rgba(255, 140, 0, .6);
+}
+
+
+/* Sidebar thread list readability */
+.sidebar .thread-item, .sidebar .thread-item *{
+  color: var(--text) !important;
+}
+.thread-item{ color: var(--text); }
+
+/* Show full thread title */
+#threadTitle{
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.thread-item .title, .thread-item .name{
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
