@@ -236,15 +236,45 @@ function renderChat() {
     bubble.innerHTML = nl2br(m.content || "");
 
     if (Array.isArray(m.sources) && m.sources.length) {
-      const src = document.createElement("div");
-      src.className = "sources";
+      // Collapsible references (future-proof for multi-layer sources)
+      const wrap = document.createElement("div");
+      wrap.className = "refs";
+
+      const details = document.createElement("details");
+      details.className = "refs-details";
+      details.open = false;
+
+      const summary = document.createElement("summary");
+      summary.className = "refs-summary";
+      summary.textContent = `参照（${m.sources.length}件）`;
+      details.appendChild(summary);
+
+      const body = document.createElement("div");
+      body.className = "refs-body";
+
+      // Layer 1: Knowledge (Upstash Vector)
+      const sec1 = document.createElement("div");
+      sec1.className = "refs-section";
+      sec1.innerHTML = `<div class="refs-head">ナレッジからの事例</div>`;
+
+      const list1 = document.createElement("div");
+      list1.className = "refs-list";
+
       const items = m.sources.map(s => {
         const title = s.title ? s.title : s.id;
         const score = (s.score === null || s.score === undefined) ? "" : `（score ${Number(s.score).toFixed(3)}）`;
         return `・${escapeHtml(title)} ${escapeHtml(score)}`;
       }).join("<br>");
-      src.innerHTML = `<div style="margin-top:10px; color:var(--muted); font-size:12px;"><div style="margin-bottom:6px; font-weight:700; color:var(--text)">【参照】</div>${items}</div>`;
-      bubble.appendChild(src);
+
+      list1.innerHTML = items || "（なし）";
+      sec1.appendChild(list1);
+
+      // Placeholders for future layers (Wiki / Trusted sites) – we'll add in ⑤
+      body.appendChild(sec1);
+
+      details.appendChild(body);
+      wrap.appendChild(details);
+      bubble.appendChild(wrap);
     }
 
     if (!isUser) {
