@@ -773,8 +773,7 @@ function exportThreadCsv(thread){
     const timeISO = m.time ? new Date(m.time).toISOString() : "";
     rows.push([String(i+1), m.role || "", m.content || "", timeISO]);
   });
-  return rows.map(r => r.map(csvEscape).join(",")).join("
-");
+  return rows.map(r => r.map(csvEscape).join(",")).join("\\r\\n");
 }
 
 function getActiveThread(){
