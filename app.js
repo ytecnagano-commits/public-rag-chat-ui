@@ -273,23 +273,6 @@ function renderChat() {
     const row = document.createElement("div");
     row.className = "msg-row " + (isUser ? "user" : "assistant");
 
-    // avatar
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    if (!isUser) {
-      const img = document.createElement("img");
-      img.alt = "bot";
-      img.src = BOT_AVATAR_SRC;
-      img.loading = "lazy";
-      avatar.appendChild(img);
-    } else {
-      // User avatar is optional; keep a simple fallback label
-      const span = document.createElement("span");
-      span.className = "avatar-fallback";
-      span.textContent = "YOU";
-      avatar.appendChild(span);
-    }
-
     // bubble
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
@@ -309,7 +292,17 @@ function renderChat() {
       bubble.appendChild(src);
     }
 
-    if (!isUser) row.appendChild(avatar);
+    if (!isUser) {
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      const img = document.createElement("img");
+      img.alt = "bot";
+      img.src = BOT_AVATAR_SRC;
+      img.loading = "lazy";
+      avatar.appendChild(img);
+      row.appendChild(avatar);
+    }
+
     row.appendChild(bubble);
     elChat.appendChild(row);
   }
