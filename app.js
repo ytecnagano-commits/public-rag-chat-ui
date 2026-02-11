@@ -1,3 +1,5 @@
+const INTRO_MESSAGE = "こんにちは！Y-TEC トラブル解決BOT【ワイテッくん】だよ。\n役に立ったり立たなかったりするよ！\n\n【使い方】\n- 症状を1文で（例：Wi‑Fiがつながらない）\n- 機種/OS（例：Windows 11 / iPhone 15）\n- 直前にやったこと（更新/設定変更/ソフト導入など）\n- エラーメッセージ（あればそのまま）\n\n【注意】\n- 分解/感電/発熱/バッテリー膨張/液体こぼし等の危険がある作業は無理しないでね。\n- 医療・法律・電気工事などは一般案内になるので、必要なら専門家へ。\n- パスワード/個人情報は送らないでOK！\n";
+
 // ===== Config =====
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
@@ -32,7 +34,9 @@ function newThread() {
     title: "新しいチャット",
     createdAt: nowIso(),
     updatedAt: nowIso(),
-    messages: [] // {role:"user"|"assistant", content:"", sources?:[]}
+    messages: [
+      { role: "assistant", content: INTRO_MESSAGE, time: nowIso() }
+    ] // {role:"user"|"assistant", content:"", sources?:[]}
   };
 }
 
