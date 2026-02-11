@@ -258,3 +258,41 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin{ to{ transform: rotate(360deg);} }
+
+
+/* ===== Fix brand layout (avatar + 2-line centered title) ===== */
+.brand{
+  display:grid;
+  grid-template-columns: 34px 1fr;
+  gap:12px;
+  align-items:center;
+}
+.brand-avatar{
+  width:34px;
+  height:34px;
+  border-radius:999px;
+  object-fit:cover;
+  border:1px solid var(--border);
+}
+.brand-text{ min-width: 0; }
+.brand-title{
+  font-weight:800;
+  font-size:14px;
+  line-height:1.2;
+  text-align:center;
+}
+.brand-sub{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+  text-align:center;
+}
+
+/* Sidebar thread list text to white */
+.thread, .thread *{ color: var(--text) !important; }
+
+/* Ensure top title wraps fully */
+#threadTitle{ white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+
+/* Composer row */
+.composer-row{ display:flex; gap:10px; align-items:flex-end; }
