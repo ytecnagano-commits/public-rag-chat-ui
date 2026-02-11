@@ -807,21 +807,32 @@ copyBtn?.addEventListener("click", async (ev) => {
   });
 
   importFileInput?.addEventListener("change", async () => {
-    const file = importFileInput.files?.[0];
-    if (!file) return;
-    try{
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const res = importThreadsFromJson(data);
-      if (res.count > 0){
-        showToast?.(`取込しました（${res.count}件）`);
-        renderAll();
-      } else {
-        showToast?.("取込できる会話がありません");
+    const files = Array.from(importFileInput.files || []);
+    if (!files.length) return;
+
+    let totalImported = 0;
+    let failed = 0;
+
+    for (const file of files) {
+      try{
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const res = importThreadsFromJson(data);
+        totalImported += (res.count || 0);
+      }catch(err){
+        console.error("import failed:", file?.name, err);
+        failed += 1;
       }
-    }catch(err){
-      console.error(err);
-      showToast?.("取込に失敗しました");
+    }
+
+    if (totalImported > 0){
+      const msg = failed > 0
+        ? `取込しました（${totalImported}件） / 失敗 ${failed}件`
+        : `取込しました（${totalImported}件）`;
+      showToast?.(msg);
+      renderAll();
+    } else {
+      showToast?.(failed > 0 ? `取込できませんでした（失敗 ${failed}件）` : "取込できる会話がありません");
     }
   });
 }
