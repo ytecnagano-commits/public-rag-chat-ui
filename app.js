@@ -667,12 +667,67 @@ function showToast(message, ms = 1600){
     setTimeout(() => el.remove(), 300);
   }, ms);
 }
+
+function genId(prefix="t"){
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2,10)}`;
+}
+
+function normalizeMessage(m){
+  if (!m || typeof m !== "object") return null;
+  const role = (m.role === "user" || m.role === "assistant") ? m.role : (m.role ? String(m.role) : "assistant");
+  const content = (m.content ?? m.text ?? "");
+  const msg = { role, content: String(content) };
+  if (m.time) msg.time = m.time;
+  if (Array.isArray(m.sources)) msg.sources = m.sources;
+  return msg;
+}
+
+function normalizeThread(t){
+  if (!t || typeof t !== "object") return null;
+  const messagesRaw = Array.isArray(t.messages) ? t.messages : Array.isArray(t.chat) ? t.chat : [];
+  const messages = messagesRaw.map(normalizeMessage).filter(Boolean);
+  if (!messages.length) return null;
+
+  const title = String(t.title || t.name || "取込チャット");
+  return {
+    id: genId("imp"),
+    title,
+    messages,
+    createdAt: t.createdAt || Date.now(),
+  };
+}
+
+function importThreadsFromJson(data){
+  const list = [];
+  if (Array.isArray(data)) list.push(...data);
+  else if (data && typeof data === "object") {
+    if (Array.isArray(data.threads)) list.push(...data.threads);
+    else if (Array.isArray(data.data)) list.push(...data.data);
+    else list.push(data);
+  }
+
+  let added = 0;
+  for (const item of list) {
+    const nt = normalizeThread(item);
+    if (!nt) continue;
+    threads.unshift(nt);
+    added++;
+  }
+  if (added > 0){
+    activeId = threads[0].id;
+    saveThreads(threads);
+  }
+  return { count: added };
+}
+
 function bindTopbarActions(){
   const copyBtn = document.getElementById("copyBtn");
   const dlBtn = document.getElementById("downloadBtn");
   const clearBtn = document.getElementById("clearBtn");
 
-  copyBtn?.addEventListener("click", async (ev) => {
+    const importBtn = document.getElementById("importBtn");
+  const importFileInput = document.getElementById("importFileInput");
+copyBtn?.addEventListener("click", async (ev) => {
     ev.preventDefault();
     const t = getActiveThread?.() || null;
     if (!t) return;
@@ -739,6 +794,35 @@ function bindTopbarActions(){
   clearBtn?.addEventListener("click", (ev) => {
     ev.preventDefault();
     clearActiveThread?.();
+  });
+
+  importBtn?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    if (!importFileInput) {
+      showToast?.("取込UIが見つかりません");
+      return;
+    }
+    importFileInput.value = "";
+    importFileInput.click();
+  });
+
+  importFileInput?.addEventListener("change", async () => {
+    const file = importFileInput.files?.[0];
+    if (!file) return;
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const res = importThreadsFromJson(data);
+      if (res.count > 0){
+        showToast?.(`取込しました（${res.count}件）`);
+        renderAll();
+      } else {
+        showToast?.("取込できる会話がありません");
+      }
+    }catch(err){
+      console.error(err);
+      showToast?.("取込に失敗しました");
+    }
   });
 }
 
