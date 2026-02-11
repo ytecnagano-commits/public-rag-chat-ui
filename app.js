@@ -5,7 +5,7 @@ const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 522, 524]);
 
 // API endpoint (configurable)
-const DEFAULT_API_URL = new URL("/chat", location.origin).href;
+const DEFAULT_API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 const LS_API_URL = "public_rag_api_url";
 let API_URL = localStorage.getItem(LS_API_URL) || DEFAULT_API_URL;
 let METRICS_URL = API_URL.replace(/\/chat$/, "/metrics");
@@ -493,16 +493,30 @@ elClearBtn?.addEventListener("click", () => {
   }
   renderAll();
 
-  // init API URL input
+    // init API URL input (admin-only UI)
+  const isAdmin = new URLSearchParams(location.search).get("admin") === "1"
+    || localStorage.getItem("showApiConfig") === "1";
+
+  const elApiWrap = document.querySelector("#apiConfigWrap");
+  const elToggleApi = document.querySelector("#toggleApiConfigBtn");
+
+  if (elToggleApi) elToggleApi.hidden = !isAdmin;
+  if (elApiWrap) elApiWrap.hidden = !isAdmin;
+
   if (elApiUrlInput) elApiUrlInput.value = API_URL;
+
+  elToggleApi?.addEventListener("click", () => {
+    const next = !(elApiWrap && !elApiWrap.hidden);
+    if (elApiWrap) elApiWrap.hidden = !next;
+    localStorage.setItem("showApiConfig", next ? "1" : "0");
+  });
+
   elSaveApiUrlBtn?.addEventListener("click", () => {
     const v = (elApiUrlInput?.value || "").trim();
     if (!v) return;
     setApiUrl(v);
-    // refresh metrics immediately on change
     refreshMetricsOnce();
   });
-
 startMetricsPolling();
   elInput?.focus();
 })();
