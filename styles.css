@@ -322,3 +322,16 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   text-align: center;
   width: 100%;
 }
+
+/* API config */
+.api-config{ margin: 10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.api-config .api-hint{ font-size:11px; color: var(--muted); width:100%; line-height:1.3; }
+.input{
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(17,27,42,.35);
+  color: var(--text);
+}
