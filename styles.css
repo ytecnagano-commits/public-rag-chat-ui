@@ -209,3 +209,26 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   white-space:nowrap;
 }
 .rate-banner__opt input{transform: translateY(1px);}
+
+
+/* status line (connecting / retrying) */
+.status-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 2px;
+  color: var(--muted);
+  font-size:12px;
+}
+.status-dot{
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background: currentColor;
+  opacity:.55;
+  animation: statusPulse 1.1s infinite ease-in-out;
+}
+@keyframes statusPulse{
+  0%,100%{ transform: scale(.75); opacity:.35; }
+  50%{ transform: scale(1); opacity:.85; }
+}
