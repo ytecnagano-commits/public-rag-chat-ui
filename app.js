@@ -38,6 +38,10 @@ const elBanner       = $("#rateBanner");
 const elBannerText   = $("#rateBannerText");
 const elAutoResend   = $("#rateAutoResend");
 
+// status
+const elStatusLine  = $("#statusLine");
+const elStatusText  = $("#statusText");
+
 // ===== State =====
 let threads = loadThreads();
 let activeId = (threads[0] && threads[0].id) || null;
@@ -83,11 +87,30 @@ function updateComposerState() {
 function setSending(v) {
   isSending = !!v;
   updateComposerState();
+  if (isSending) {
+    setStatus("接続中…");
+  } else {
+    // hide when not sending (banner handles rate-limit / retry messaging)
+    if (!rateLocked) setStatus("");
+  }
 }
 
 function stopInFlight() {
   try { currentAbort?.abort(); } catch {}
   currentAbort = null;
+}
+
+function setStatus(text) {
+  if (!elStatusLine) return;
+  const t = (text || "").trim();
+  if (!t) {
+    elStatusLine.hidden = true;
+    if (elStatusText) elStatusText.textContent = "";
+    return;
+  }
+  elStatusLine.hidden = false;
+  if (elStatusText) elStatusText.textContent = t;
+  else elStatusLine.textContent = t;
 }
 
 function clearBanner() {
@@ -104,6 +127,7 @@ function showBanner({ mode, seconds, message }) {
 
   // mode: "rate" | "retry"
   clearBanner();
+  setStatus("");
 
   // rate lock during countdown
   rateLocked = true;
@@ -111,6 +135,7 @@ function showBanner({ mode, seconds, message }) {
 
   // stop in-flight to prevent late replies showing up during cooldown
   stopInFlight();
+  if (mode !== "retry") setStatus("");
 
   let remain = Math.max(0, Number(seconds || 0));
   elBanner.hidden = false;
@@ -127,6 +152,11 @@ function showBanner({ mode, seconds, message }) {
 
     if (elBannerText) elBannerText.textContent = message || (prefix + suffix);
     else elBanner.textContent = message || (prefix + suffix);
+
+    // small status line: show only for retry countdown
+    if (mode === "retry") {
+      setStatus(`再試行まで ${remain}秒…`);
+    }
   };
 
   render();
@@ -140,6 +170,8 @@ function showBanner({ mode, seconds, message }) {
       rateLocked = false;
       updateComposerState();
       clearBanner();
+  setStatus("");
+      setStatus("");
       elInput.focus();
 
       // Auto action at the end of countdown
@@ -362,6 +394,7 @@ function clearActiveThread() {
   saveThreads(threads);
   pendingCall = null;
   clearBanner();
+  setStatus("");
   rateLocked = false;
   setSending(false);
   renderAll();
@@ -374,6 +407,7 @@ function createNewThreadAndSelect() {
   saveThreads(threads);
   pendingCall = null;
   clearBanner();
+  setStatus("");
   rateLocked = false;
   setSending(false);
   renderAll();
