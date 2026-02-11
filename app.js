@@ -683,11 +683,49 @@ function bindTopbarActions(){
 
   dlBtn?.addEventListener("click", (ev) => {
     ev.preventDefault();
+    const menu = document.getElementById("downloadMenu");
+    if (!menu) return;
+    // toggle
+    menu.hidden = !menu.hidden;
+  });
+
+  // close menu when clicking outside
+  document.addEventListener("click", (e) => {
+    const menu = document.getElementById("downloadMenu");
+    if (!menu) return;
+    const btn = document.getElementById("downloadBtn");
+    if (menu.hidden) return;
+    const within = menu.contains(e.target) || btn?.contains(e.target);
+    if (!within) menu.hidden = true;
+  }, { capture: true });
+
+  // handle menu item click
+  document.getElementById("downloadMenu")?.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return;
+    const fmt = target.getAttribute("data-dl");
+    if (!fmt) return;
+    ev.preventDefault();
+
     const t = getActiveThread?.() || null;
     if (!t) return;
+
     const safeTitle = (t.title || "chat").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    downloadJsonFile(`ytec_${safeTitle}_${stamp}.json`, t);
+
+    if (fmt === "json") {
+      downloadJsonFile(`ytec_${safeTitle}_${stamp}.json`, t);
+    } else if (fmt === "txt") {
+      const md = exportThreadMarkdown(t);
+      downloadTextFile(`ytec_${safeTitle}_${stamp}.txt`, md);
+    } else if (fmt === "csv") {
+      const csv = exportThreadCsv(t);
+      downloadTextFile(`ytec_${safeTitle}_${stamp}.csv`, csv);
+    }
+
+    const menu = document.getElementById("downloadMenu");
+    if (menu) menu.hidden = true;
+    showToast?.("ダウンロードしました");
   });
 
   clearBtn?.addEventListener("click", (ev) => {
@@ -699,3 +737,58 @@ function bindTopbarActions(){
 document.addEventListener("DOMContentLoaded", () => {
   bindTopbarActions();
 });
+
+
+function downloadTextFile(filename, text){
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function csvEscape(v){
+  const s = String(v ?? "");
+  // escape double quotes by doubling
+  const t = s.replace(/"/g, '""');
+  return `"${t}"`;
+}
+
+function exportThreadCsv(thread){
+  // Columns: idx, role, content, timeISO
+  const rows = [];
+  rows.push(["idx","role","content","timeISO"]);
+  (thread.messages || []).forEach((m, i) => {
+    const timeISO = m.time ? new Date(m.time).toISOString() : "";
+    rows.push([String(i+1), m.role || "", m.content || "", timeISO]);
+  });
+  return rows.map(r => r.map(csvEscape).join(",")).join("\n");
+}
+
+function getActiveThread(){
+  // relies on activeId + threads in scope; defined in original app.js
+  try{
+    return (threads || []).find(t => t.id === activeId) || null;
+  }catch{
+    return null;
+  }
+}
+
+function clearActiveThread(){
+  if (!confirm("この会話を削除しますか？（このブラウザ内のデータです）")) return;
+  const idx = threads.findIndex(t => t.id === activeId);
+  if (idx >= 0) threads.splice(idx, 1);
+  if (!threads.length){
+    const nt = newThread();
+    threads = [nt];
+    activeId = nt.id;
+  }else{
+    activeId = threads[0].id;
+  }
+  saveThreads(threads);
+  renderAll();
+}
