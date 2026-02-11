@@ -38,7 +38,16 @@
       <section id="chat" class="chat"></section>
 
       <section class="composer">
-        <div id="rateBanner" class="rate-banner" hidden></div>
+        <div id="rateBanner" class="rate-banner" hidden>
+          <div class="rate-banner__row">
+            <div id="rateBannerText" class="rate-banner__text"></div>
+            <label class="rate-banner__opt">
+              <input type="checkbox" id="rateAutoResend" checked />
+              解除後に自動再送
+            </label>
+          </div>
+        </div>
+
         <div class="composer-row">
           <textarea id="input" rows="1" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
           <button id="sendBtn" class="btn btn-primary">送信</button>
@@ -47,6 +56,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=9"></script>
+  <script src="./app.js?v=10"></script>
 </body>
 </html>
