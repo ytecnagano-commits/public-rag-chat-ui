@@ -22,6 +22,17 @@
       <div class="section-title">履歴（このブラウザ）</div>
       <div id="threadList" class="thread-list"></div>
 
+      <div class="section-title">管理</div>
+      <div id="metricsPanel" class="metrics">
+        <div class="metrics-row"><span class="metrics-label">現在</span><span id="metricsBucket" class="metrics-value">-</span></div>
+        <div class="metrics-grid">
+          <div class="metrics-item"><div class="k">req</div><div id="mReq" class="v">-</div></div>
+          <div class="metrics-item"><div class="k">ok</div><div id="mOk" class="v">-</div></div>
+          <div class="metrics-item"><div class="k">429</div><div id="mRl" class="v">-</div></div>
+          <div class="metrics-item"><div class="k">err</div><div id="mErr" class="v">-</div></div>
+        </div>
+        <div class="metrics-foot"><span id="metricsUpdated">未取得</span></div>
+      </div>
       <div class="footer-note">
         ※ 公開運用ではレート制限の設定を推奨
       </div>
@@ -61,6 +72,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=11"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>
