@@ -335,3 +335,6 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   background: rgba(17,27,42,.35);
   color: var(--text);
 }
+
+/* Small button */
+.btn-small{ padding: 8px 10px; font-size: 12px; opacity: .85; }
