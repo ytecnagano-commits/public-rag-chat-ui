@@ -1,6 +1,6 @@
 // ===== Config =====
-const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
-const METRICS_URL = API_URL.replace(/\/chat$/, "/metrics");
+const API_URL = new URL("/chat", location.origin).href;
+const METRICS_URL = new URL("/metrics", location.origin).href;
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
 // Transient errors that are worth retrying
