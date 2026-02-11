@@ -1,4 +1,6 @@
 // ===== Config =====
+const BOT_AVATAR_SRC = "./bot-avatar.jpg";
+
 const API_URL = "https://public-rag-api.ytec-nagano.workers.dev/chat";
 const METRICS_URL = API_URL.replace(/\/chat\b/, "/metrics");
 
@@ -266,9 +268,32 @@ function renderChat() {
   if (!t) return;
 
   for (const m of (t.messages || [])) {
-    const box = document.createElement("div");
-    box.className = "msg " + (m.role === "user" ? "user" : "assistant");
-    box.innerHTML = nl2br(m.content || "");
+    const isUser = (m.role === "user");
+
+    const row = document.createElement("div");
+    row.className = "msg-row " + (isUser ? "user" : "assistant");
+
+    // avatar
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    if (!isUser) {
+      const img = document.createElement("img");
+      img.alt = "bot";
+      img.src = BOT_AVATAR_SRC;
+      img.loading = "lazy";
+      avatar.appendChild(img);
+    } else {
+      // User avatar is optional; keep a simple fallback label
+      const span = document.createElement("span");
+      span.className = "avatar-fallback";
+      span.textContent = "YOU";
+      avatar.appendChild(span);
+    }
+
+    // bubble
+    const bubble = document.createElement("div");
+    bubble.className = "msg-bubble";
+    bubble.innerHTML = nl2br(m.content || "");
 
     if (Array.isArray(m.sources) && m.sources.length) {
       const items = m.sources.map(s => {
@@ -281,10 +306,12 @@ function renderChat() {
       src.style.color = "var(--muted)";
       src.style.fontSize = "12px";
       src.innerHTML = `<div style="margin-bottom:6px; font-weight:700; color:var(--text)">【参照】</div>${items}`;
-      box.appendChild(src);
+      bubble.appendChild(src);
     }
 
-    elChat.appendChild(box);
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    elChat.appendChild(row);
   }
 
   elThreadTitle.textContent = t.title || "新しいチャット";
