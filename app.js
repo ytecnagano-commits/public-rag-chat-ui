@@ -16,7 +16,7 @@ const WELCOME_MESSAGE = `こんにちは！Y-TEC トラブル解決BOT【ワイ�
 - 法律・電気工事などは一般案内になるので、必要なら専門家へ確認してね。
 - パスワード/個人情報は絶対に送っちゃダメだよ！
 - 僕はAIなので、起こっているトラブルを直接診断しているわけではなく、過去の事例から情報を提供しているだけだよ。
-- AIの特性上、関係のない情報を提示したり、ハルシネーションを起こしてウソをつく事があるかもしれないので自己責任で利用してね。`;
+- AIの特性上、ハルシネーションを起こしてウソをついたり、関係のない情報を提示するかもしれないので自己責任で利用してね。`;
 
 // Transient errors that are worth retrying
 const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 522, 524]);
@@ -75,6 +75,10 @@ const elThreadTitle = $("#threadTitle");
 const elChat        = $("#chat");
 const elInput       = $("#input");
 const elSendBtn     = $("#sendBtn");
+
+const elMenuBtn     = $("#menuBtn");
+const elSidebar     = document.querySelector(".sidebar");
+const elBackdrop    = $("#sidebarBackdrop");
 
 const elApiUrlInput = $("#apiUrlInput");
 const elSaveApiUrlBtn = $("#saveApiUrlBtn");
@@ -370,11 +374,20 @@ function renderThreadList() {
       saveThreads(threads);
       renderAll();
   ensureWelcomeMessage(getActiveThread());
+
+  // Mobile: sidebar drawer
+  elMenuBtn?.addEventListener("click", () => {
+    const open = elSidebar?.classList.contains("open");
+    setSidebarOpen(!open);
+  });
+  elBackdrop?.addEventListener("click", () => setSidebarOpen(false));
+  window.addEventListener("resize", () => { if (!isMobileLayout()) setSidebarOpen(false); });
     });
 
     btn.addEventListener("click", () => {
       activeId = t.id;
       renderAll();
+      if (isMobileLayout()) setSidebarOpen(false);
     });
     elThreadList.appendChild(btn);
   }
@@ -965,4 +978,19 @@ function clearActiveThread(){
   }
   saveThreads(threads);
   renderAll();
+}function isMobileLayout() {
+  return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
 }
+
+function setSidebarOpen(open) {
+  if (!elSidebar || !elBackdrop) return;
+  if (open) {
+    elSidebar.classList.add("open");
+    elBackdrop.hidden = false;
+  } else {
+    elSidebar.classList.remove("open");
+    elBackdrop.hidden = true;
+  }
+}
+
+
