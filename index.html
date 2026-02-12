@@ -59,6 +59,12 @@
         <div class="topbar-actions">
           <button id="copyBtn" class="btn btn-ghost" title="この会話をMarkdownでコピー" type="button">コピー</button>
           <button id="downloadBtn" class="btn btn-ghost" title="この会話をJSONで保存" type="button">DL</button>
+
+          <div id="downloadMenu" class="menu-popup" hidden>
+            <button class="menu-item" type="button" data-dl="json">.json で保存</button>
+            <button class="menu-item" type="button" data-dl="txt">.txt で保存</button>
+            <button class="menu-item" type="button" data-dl="csv">.csv で保存</button>
+          </div>
           <button id="clearBtn" class="btn btn-ghost" type="button">この会話を消す</button>
         </div>
       </header>
