@@ -537,3 +537,14 @@ html, body { height: 100%; overflow: hidden; }
 @media (max-width: 900px){
   #menuBtn{ display: inline-flex !important; }
 }
+
+
+/* v16 force mobile drawer sidebar (override older rules) */
+@media (max-width: 900px){
+  .sidebar{ display:flex !important; }
+  .sidebar{ position:fixed !important; top:0; left:0; bottom:0; }
+  .sidebar{ width:min(320px, 84vw) !important; z-index:60 !important; }
+  .sidebar{ transform: translateX(-110%) !important; transition: transform .2s ease !important; }
+  .sidebar.open{ transform: translateX(0) !important; }
+  #sidebarBackdrop.backdrop{ display:block; }
+}
