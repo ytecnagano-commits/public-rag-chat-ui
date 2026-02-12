@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=17" />
+  <link rel="stylesheet" href="./styles.css?v=18" />
 </head>
 <body>
   <div class="app">
@@ -96,6 +96,38 @@
     </main>
   </div>
 
-  <script src="./app.js?v=17"></script>
+  <script src="./app.js?v=18"></script>
+
+  <script>
+  // v18: ensure mobile sidebar toggle works even if app.js is cached
+  (function(){
+    const menuBtn = document.getElementById("menuBtn");
+    const sidebar = document.querySelector(".sidebar");
+    const backdrop = document.getElementById("sidebarBackdrop");
+    function setOpen(open){
+      if(!sidebar || !backdrop) return;
+      if(open){
+        sidebar.classList.add("open");
+        backdrop.hidden = false;
+      } else {
+        sidebar.classList.remove("open");
+        backdrop.hidden = true;
+      }
+    }
+    window.__toggleSidebar = function(){
+      const open = sidebar && sidebar.classList.contains("open");
+      setOpen(!open);
+    };
+    if(menuBtn){
+      menuBtn.addEventListener("click", (e)=>{ e.preventDefault(); window.__toggleSidebar(); });
+    }
+    if(backdrop){
+      backdrop.addEventListener("click", ()=>setOpen(false));
+    }
+    window.addEventListener("resize", ()=>{ if(window.matchMedia && !window.matchMedia("(max-width: 900px)").matches) setOpen(false); });
+    // close by default
+    setOpen(false);
+  })();
+  </script>
 </body>
 </html>
