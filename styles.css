@@ -232,6 +232,14 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   word-break:break-word;
   background: rgba(17,27,42,.55);
 }
+
+
+.msg-bubble a{
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.msg-bubble a:hover{ opacity:.9; }
 .msg-row.assistant .msg-bubble{ border-color: rgba(255, 140, 0, .65); }
 .msg-row.user .msg-bubble{ background: rgba(47,129,247,.14); border-color: rgba(47,129,247,.35); }
 
