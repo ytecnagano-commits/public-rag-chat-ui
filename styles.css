@@ -546,5 +546,13 @@ html, body { height: 100%; overflow: hidden; }
   .sidebar{ width:min(320px, 84vw) !important; z-index:60 !important; }
   .sidebar{ transform: translateX(-110%) !important; transition: transform .2s ease !important; }
   .sidebar.open{ transform: translateX(0) !important; }
-  #sidebarBackdrop.backdrop{ display:block; }
+  #sidebarBackdrop.backdrop{ display:none; }
+}
+
+
+/* v17 fix: backdrop should not block UI when hidden */
+[hidden]{ display:none !important; }
+@media (max-width: 900px){
+  /* only show backdrop when NOT hidden */
+  .backdrop:not([hidden]){ display:block !important; }
 }
