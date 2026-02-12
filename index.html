@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=11" />
+  <link rel="stylesheet" href="./styles.css?v=8" />
 </head>
 <body>
   <div class="app">
@@ -59,12 +59,6 @@
         <div class="topbar-actions">
           <button id="copyBtn" class="btn btn-ghost" title="この会話をMarkdownでコピー" type="button">コピー</button>
           <button id="downloadBtn" class="btn btn-ghost" title="この会話をJSONで保存" type="button">DL</button>
-        <div id="downloadMenu" class="menu-popup" hidden>
-          <button class="menu-item" type="button" data-dl="txt">DL (.txt)</button>
-          <button class="menu-item" type="button" data-dl="csv">DL (.csv)</button>
-          <button class="menu-item" type="button" data-dl="json">DL (.json)</button>
-        </div>
-          <button id="importBtn" class="btn btn-ghost" type="button" title="保存したJSONを取り込む">取込</button>
           <button id="clearBtn" class="btn btn-ghost" type="button">この会話を消す</button>
         </div>
       </header>
@@ -92,7 +86,6 @@
     </main>
   </div>
 
-  <input id="importFileInput" type="file" accept=".json,application/json" hidden multiple hidden />
-  <script src="./app.js?v=17"></script>
+  <script src="./app.js?v=8"></script>
 </body>
 </html>
