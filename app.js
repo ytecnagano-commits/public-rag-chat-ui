@@ -657,14 +657,16 @@ elClearBtn?.addEventListener("click", () => {
   renderAll();
 
     // init API URL input (admin-only UI)
-  const isAdmin = new URLSearchParams(location.search).get("admin") === "1"
-    || localStorage.getItem("showApiConfig") === "1";
+  const isAdmin = new URLSearchParams(location.search).get("admin") === "1";
 
   const elApiWrap = document.querySelector("#apiConfigWrap");
   const elToggleApi = document.querySelector("#toggleApiConfigBtn");
+  const elAdminMetrics = document.querySelector("#adminMetricsWrap");
 
+  const showApiConfig = isAdmin && localStorage.getItem("showApiConfig") === "1";
   if (elToggleApi) elToggleApi.hidden = !isAdmin;
-  if (elApiWrap) elApiWrap.hidden = !isAdmin;
+  if (elApiWrap) elApiWrap.hidden = !showApiConfig;
+  if (elAdminMetrics) elAdminMetrics.hidden = !isAdmin;
 
   if (elApiUrlInput) elApiUrlInput.value = API_URL;
 
