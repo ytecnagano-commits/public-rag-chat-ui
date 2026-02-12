@@ -486,3 +486,11 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
   background: rgba(255,255,255,.08);
 }
 .topbar-actions{ position: relative; }
+
+
+/* v10 scroll fix */
+body{overflow:hidden}
+.app{overflow:hidden}
+.sidebar{overflow:auto; min-height:0}
+.main{height:100vh; min-height:0}
+.chat{min-height:0; overflow:auto}
