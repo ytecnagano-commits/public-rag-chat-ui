@@ -556,3 +556,22 @@ html, body { height: 100%; overflow: hidden; }
   /* only show backdrop when NOT hidden */
   .backdrop:not([hidden]){ display:block !important; }
 }
+
+
+/* v19 mobile: truncate long chat titles to keep topbar buttons aligned */
+@media (max-width: 900px){
+  .topbar{ display:flex; align-items:center; gap:10px; }
+  #threadTitle{
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+  .topbar-actions{
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
