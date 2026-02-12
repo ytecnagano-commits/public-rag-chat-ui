@@ -1,5 +1,3 @@
-const INTRO_MESSAGE = "こんにちは！Y-TEC トラブル解決BOT【ワイテッくん】だよ。\n役に立ったり立たなかったりするよ！\n\n【使い方】\n- 症状を1文で（例：Wi‑Fiがつながらない）\n- 機種/OS（例：Windows 11 / iPhone 15）\n- 直前にやったこと（更新/設定変更/ソフト導入など）\n- エラーメッセージ（あればそのまま）\n\n【注意】\n- 分解/感電/発熱/バッテリー膨張/液体こぼし等の危険がある作業は無理しないでね。\n- 法律・電気工事などは一般案内になるので、必要なら専門家へご確認ください。\n- 僕はAIなので、起こっているトラブルを直接診断しているわけではなく、過去の事例から情報を提供しているだけです。\n- AIの特性上、ハルシネーションを起こしてウソをつく事があるかもしれませんので自己責任でご利用ください。\n- パスワード/個人情報は送らないでOK！\n";
-
 // ===== Config =====
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
@@ -34,9 +32,7 @@ function newThread() {
     title: "新しいチャット",
     createdAt: nowIso(),
     updatedAt: nowIso(),
-    messages: [
-      { role: "assistant", content: INTRO_MESSAGE, time: nowIso() }
-    ] // {role:"user"|"assistant", content:"", sources?:[]}
+    messages: [] // {role:"user"|"assistant", content:"", sources?:[]}
   };
 }
 
@@ -101,6 +97,39 @@ function escapeHtml(s) {
 function nl2br(s) {
   return escapeHtml(s).replace(/\n/g, "<br>");
 }
+
+function formatMessageHtml(text) {
+  const escaped = escapeHtml(text || "");
+
+  // Preserve markdown links like: [label](https://example.com)
+  const stash = [];
+  let tmp = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, label, url) => {
+    const token = `__MDLINK_${stash.length}__`;
+    stash.push(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+    return token;
+  });
+
+  // Linkify bare URLs
+  tmp = tmp.replace(/https?:\/\/[^\s<>"]+/g, (raw) => {
+    let url = raw;
+    let trail = '';
+    // Trim common trailing punctuation (including Japanese)
+    while (url && /[\]\)\}\>、。．，\.\!\?\;\:」』】）》]+$/.test(url)) {
+      trail = url.slice(-1) + trail;
+      url = url.slice(0, -1);
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${trail}`;
+  });
+
+  // Restore markdown anchors
+  for (let i = 0; i < stash.length; i++) {
+    const token = `__MDLINK_${i}__`;
+    tmp = tmp.split(token).join(stash[i]);
+  }
+
+  return tmp.replace(/\n/g, '<br>');
+}
+
 
 
 function exportThreadMarkdown(t){
@@ -337,7 +366,7 @@ function renderChat() {
     // bubble
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
-    bubble.innerHTML = nl2br(m.content || "");
+    bubble.innerHTML = formatMessageHtml(m.content || "");
 
     if (Array.isArray(m.sources) && m.sources.length) {
       // Collapsible references (future-proof for multi-layer sources)
