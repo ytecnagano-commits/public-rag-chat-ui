@@ -1,6 +1,22 @@
 // ===== Config =====
 const BOT_AVATAR_SRC = "./bot-avatar.jpg";
 
+const WELCOME_MESSAGE = `こんにちは！Y-TEC トラブル解決BOT【ワイテッくん】だよ。
+役に立ったり立たなかったりするよ！
+
+【使い方】
+- 症状を1文で（例：Wi‑Fiがつながらない）
+- 機種/OS（例：Windows 11 / iPhone 15）
+- 直前にやったこと（更新/設定変更/ソフト導入など）
+- エラーメッセージ（あればそのまま）
+
+【注意】
+- 分解/感電/発熱/バッテリー膨張/液体こぼし等の危険がある作業は無理しないでね。
+- 法律・電気工事などは一般案内になるので、必要なら専門家へご確認ください。
+- 僕はAIなので、起こっているトラブルを直接診断しているわけではなく、過去の事例から情報を提供しているだけです。
+- AIの特性上、ハルシネーションを起こしてウソをつく事があるかもしれませんので自己責任でご利用ください。
+- パスワード/個人情報は送らないでOK！`;
+
 // Transient errors that are worth retrying
 const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 522, 524]);
 
@@ -32,8 +48,18 @@ function newThread() {
     title: "新しいチャット",
     createdAt: nowIso(),
     updatedAt: nowIso(),
-    messages: [] // {role:"user"|"assistant", content:"", sources?:[]}
+    messages: [{ role: "assistant", content: WELCOME_MESSAGE, sources: null }]
   };
+}
+
+function ensureWelcomeMessage(thread) {
+  if (!thread) return;
+  thread.messages = thread.messages || [];
+  if (thread.messages.length === 0) {
+    thread.messages.push({ role: "assistant", content: WELCOME_MESSAGE, sources: null });
+    thread.updatedAt = nowIso();
+    saveThreads(threads);
+  }
 }
 
 // ===== DOM =====
@@ -342,6 +368,7 @@ function renderThreadList() {
       }
       saveThreads(threads);
       renderAll();
+  ensureWelcomeMessage(getActiveThread());
     });
 
     btn.addEventListener("click", () => {
@@ -356,6 +383,7 @@ function renderChat() {
   const t = getActiveThread();
   elChat.innerHTML = "";
   if (!t) return;
+  ensureWelcomeMessage(t);
 
   for (const m of (t.messages || [])) {
     const isUser = (m.role === "user");
@@ -637,7 +665,7 @@ elNewChatBtn?.addEventListener("click", () => {
 elClearBtn?.addEventListener("click", () => {
   const t = getActiveThread();
   if (!t) return;
-  t.messages = [];
+  t.messages = [{ role: "assistant", content: WELCOME_MESSAGE, sources: null }];
   t.title = "新しいチャット";
   t.updatedAt = nowIso();
   saveThreads(threads);
