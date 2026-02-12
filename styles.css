@@ -166,7 +166,30 @@ textarea:focus{border-color: rgba(47,129,247,.6)}
 
 @media (max-width: 900px){
   .app{grid-template-columns: 1fr}
-  .sidebar{display:none}
+  #menuBtn{display:inline-flex}
+  .topbar-actions{ gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .chat{ padding: 12px; }
+  .msg-row{ max-width: 100%; }
+
+  .sidebar{
+    display:flex;
+    position:fixed;
+    top:0; left:0; bottom:0;
+    width:min(320px, 84vw);
+    z-index:60;
+    transform: translateX(-110%);
+    transition: transform .2s ease;
+    border-right:1px solid var(--border);
+    box-shadow: var(--shadow);
+    background: linear-gradient(180deg, rgba(15,22,34,.98), rgba(12,18,28,.98));
+  }
+  .sidebar.open{ transform: translateX(0); }
+  .backdrop{
+    position:fixed;
+    inset:0;
+    background: rgba(0,0,0,.55);
+    z-index:50;
+  }
 }
 
 
@@ -497,3 +520,9 @@ body{overflow:hidden}
 
 
 /* v11 admin gate */
+
+
+#menuBtn{display:none}
+
+
+.btn-icon{padding:8px 10px; font-weight:900; font-size:18px; line-height:1}
