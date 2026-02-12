@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Y-TEC トラブル解決BOT【ワイテッくん】</title>
-  <link rel="stylesheet" href="./styles.css?v=13" />
+  <link rel="stylesheet" href="./styles.css?v=14" />
 </head>
 <body>
   <div class="app">
@@ -55,8 +55,10 @@
       <div class="footer-note">Copyright (C) 2026- Y-TEC</div>
     </aside>
 
-    <main class="main">
+        <div id="sidebarBackdrop" class="backdrop" hidden></div>
+<main class="main">
       <header class="topbar">
+        <button id="menuBtn" class="btn btn-ghost btn-icon" type="button" title="履歴">≡</button>
         <div id="threadTitle" class="thread-title-top">新しいチャット</div>
         <div class="topbar-actions">
           <button id="copyBtn" class="btn btn-ghost" title="この会話をMarkdownでコピー" type="button">コピー</button>
@@ -94,6 +96,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=13"></script>
+  <script src="./app.js?v=14"></script>
 </body>
 </html>
