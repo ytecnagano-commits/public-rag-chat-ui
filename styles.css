@@ -526,3 +526,14 @@ body{overflow:hidden}
 
 
 .btn-icon{padding:8px 10px; font-weight:900; font-size:18px; line-height:1}
+
+
+/* v15 mobile fixes */
+html, body { height: 100%; overflow: hidden; }
+.app { height: 100vh; height: 100dvh; overflow: hidden; }
+.main { height: 100vh; height: 100dvh; min-height: 0; }
+.topbar { position: sticky; top: 0; z-index: 40; }
+/* Ensure menu button shows on mobile (v14 had a late #menuBtn{display:none} override) */
+@media (max-width: 900px){
+  #menuBtn{ display: inline-flex !important; }
+}
