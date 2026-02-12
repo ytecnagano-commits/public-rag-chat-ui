@@ -494,3 +494,6 @@ body{overflow:hidden}
 .sidebar{overflow:auto; min-height:0}
 .main{height:100vh; min-height:0}
 .chat{min-height:0; overflow:auto}
+
+
+/* v11 admin gate */
