@@ -1018,7 +1018,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 
 
-// v22: re-apply title truncation whenever title changes (e.g., switching threads)
+// v23: re-apply title truncation whenever title changes (e.g., switching threads)
 document.addEventListener("DOMContentLoaded", ()=>{
   const el = document.getElementById("threadTitle");
   if(!el || !window.MutationObserver) return;
@@ -1026,15 +1026,10 @@ document.addEventListener("DOMContentLoaded", ()=>{
   const obs = new MutationObserver(()=>{
     if(t) clearTimeout(t);
     t = setTimeout(()=>{
-      // If some code replaced the title text without updating data-full-title,
-      // treat current text as the new full title first.
-      const cur = el.textContent || "";
-      const stored = el.getAttribute("data-full-title");
-      if(!stored || stored === "" || stored === el.textContent){
-        // Only overwrite when it looks like "full title" was replaced.
-        // If we're currently showing a truncated title, keep stored.
-        const looksTruncated = cur.endsWith("…") && (stored && stored.length > cur.length);
-        if(!looksTruncated) el.setAttribute("data-full-title", cur);
+      const cur = (el.textContent || "").trim();
+      // If the app sets a "full" title (not truncated), accept it as the new full title.
+      if(cur && !cur.endsWith("…")){
+        el.setAttribute("data-full-title", cur);
       }
       applyMobileTitleTruncate();
     }, 0);
