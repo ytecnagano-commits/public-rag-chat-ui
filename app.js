@@ -815,6 +815,8 @@ copyBtn?.addEventListener("click", async (ev) => {
 
   dlBtn?.addEventListener("click", (ev) => {
     ev.preventDefault();
+    const isMobile = window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+    if (isMobile) { openDownloadSheet(); return; }
     const menu = document.getElementById("downloadMenu");
     if (!menu) {
       // フォールバック：メニューが無い場合はJSONをDL
@@ -839,16 +841,10 @@ copyBtn?.addEventListener("click", async (ev) => {
     if (!within) menu.hidden = true;
   }, { capture: true });
 
-  // handle menu item click
-  document.getElementById("downloadMenu")?.addEventListener("click", (ev) => {
-    const target = ev.target;
-    if (!(target instanceof HTMLElement)) return;
-    const fmt = target.getAttribute("data-dl");
-    if (!fmt) return;
-    ev.preventDefault();
-
+  // v24: shared download handler (desktop dropdown + mobile bottom sheet)
+  function downloadCurrentThread(fmt){
     const t = getActiveThread?.() || null;
-    if (!t) return;
+    if (!t) return false;
 
     const safeTitle = (t.title || "chat").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -861,14 +857,60 @@ copyBtn?.addEventListener("click", async (ev) => {
     } else if (fmt === "csv") {
       const csv = exportThreadCsv(t);
       downloadCsvFile(`ytec_${safeTitle}_${stamp}.csv`, csv);
+    } else {
+      return false;
     }
+    return true;
+  }
+
+  const dlSheetOverlay = document.getElementById("downloadSheetOverlay");
+  const dlSheet = document.getElementById("downloadSheet");
+  const dlSheetClose = document.getElementById("downloadSheetClose");
+
+  function openDownloadSheet(){
+    if (!dlSheet || !dlSheetOverlay) {
+      // fallback: open dropdown menu if sheet is missing
+      document.getElementById("downloadMenu")?.removeAttribute("hidden");
+      return;
+    }
+    dlSheet.hidden = false;
+    dlSheetOverlay.hidden = false;
+    // close desktop dropdown if open
+    const menu = document.getElementById("downloadMenu");
+    if (menu) menu.hidden = true;
+  }
+  function closeDownloadSheet(){
+    if (dlSheet) dlSheet.hidden = true;
+    if (dlSheetOverlay) dlSheetOverlay.hidden = true;
+  }
+
+  dlSheetOverlay?.addEventListener("click", closeDownloadSheet);
+  dlSheetClose?.addEventListener("click", closeDownloadSheet);
+  dlSheet?.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return;
+    const fmt = target.getAttribute("data-dl");
+    if (!fmt) return;
+    ev.preventDefault();
+    if (downloadCurrentThread(fmt)) showToast?.("ダウンロードしました");
+    closeDownloadSheet();
+  });
+
+  // handle menu item click (desktop dropdown)
+  document.getElementById("downloadMenu")?.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return;
+    const fmt = target.getAttribute("data-dl");
+    if (!fmt) return;
+    ev.preventDefault();
+
+    if (downloadCurrentThread(fmt)) showToast?.("ダウンロードしました");
 
     const menu = document.getElementById("downloadMenu");
     if (menu) menu.hidden = true;
-    showToast?.("ダウンロードしました");
   });
 
-  clearBtn?.addEventListener("click", (ev) => {
+clearBtn?.addEventListener("click", (ev) => {
     ev.preventDefault();
     clearActiveThread?.();
   });
