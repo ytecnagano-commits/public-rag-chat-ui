@@ -575,3 +575,58 @@ html, body { height: 100%; overflow: hidden; }
     white-space: nowrap;
   }
 }
+
+
+/* v24 mobile: download bottom sheet (prevents clipped menu) */
+#downloadSheetOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 1800;
+}
+#downloadSheet{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1801;
+  background: rgba(14, 26, 44, 0.98);
+  border-top: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -12px 40px rgba(0,0,0,.45);
+  padding: 12px;
+}
+#downloadSheet .sheet-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 6px 6px 10px;
+}
+#downloadSheet .sheet-title{
+  font-weight: 700;
+  font-size: 14px;
+  opacity: .95;
+}
+#downloadSheet .sheet-body{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  padding: 6px;
+}
+#downloadSheet .sheet-item{
+  width: 100%;
+  text-align: left;
+  padding: 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e9f1ff;
+  font-size: 15px;
+}
+#downloadSheet .sheet-item:active{
+  transform: translateY(1px);
+}
+@media (min-width: 901px){
+  #downloadSheetOverlay, #downloadSheet{ display:none !important; }
+}
