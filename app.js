@@ -994,3 +994,23 @@ function setSidebarOpen(open) {
 }
 
 
+
+
+
+// v21: enforce mobile title truncation (simple & reliable)
+function applyMobileTitleTruncate(){
+  const el = document.getElementById("threadTitle");
+  if(!el) return;
+  const raw = el.getAttribute("data-full-title") || el.textContent || "";
+  el.setAttribute("data-full-title", raw);
+  if(window.matchMedia && window.matchMedia("(max-width: 900px)").matches){
+    el.textContent = raw.length > 5 ? raw.slice(0,5) + "…" : raw;
+  } else {
+    el.textContent = raw;
+  }
+}
+
+window.addEventListener("resize", applyMobileTitleTruncate);
+document.addEventListener("DOMContentLoaded", ()=>{
+  setTimeout(applyMobileTitleTruncate, 0);
+});
