@@ -129,5 +129,20 @@
     setOpen(false);
   })();
   </script>
+
+  <!-- Mobile Download Sheet -->
+  <div id="downloadSheetOverlay" class="overlay" hidden></div>
+  <div id="downloadSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-label="ダウンロード形式を選択">
+    <div class="sheet-header">
+      <div class="sheet-title">保存形式を選択</div>
+      <button id="downloadSheetClose" class="icon-btn" aria-label="閉じる">✕</button>
+    </div>
+    <div class="sheet-body">
+      <button class="sheet-item" data-dl="json">.json で保存</button>
+      <button class="sheet-item" data-dl="txt">.txt で保存</button>
+      <button class="sheet-item" data-dl="csv">.csv で保存</button>
+    </div>
+  </div>
+
 </body>
 </html>
