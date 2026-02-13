@@ -1002,15 +1002,44 @@ function applyMobileTitleTruncate(){
   const el = document.getElementById("threadTitle");
   if(!el) return;
   const raw = el.getAttribute("data-full-title") || el.textContent || "";
-  el.setAttribute("data-full-title", raw);
-  if(window.matchMedia && window.matchMedia("(max-width: 900px)").matches){
-    el.textContent = raw.length > 5 ? raw.slice(0,5) + "…" : raw;
-  } else {
-    el.textContent = raw;
-  }
+  // Always preserve the full title
+  if(!el.getAttribute("data-full-title")) el.setAttribute("data-full-title", raw);
+  const full = el.getAttribute("data-full-title") || "";
+  const isMobile = window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+  const desired = isMobile ? (full.length > 5 ? full.slice(0,5) + "…" : full) : full;
+  if (el.textContent === desired) return; // guard to prevent mutation loops
+  el.textContent = desired;
 }
 
 window.addEventListener("resize", applyMobileTitleTruncate);
 document.addEventListener("DOMContentLoaded", ()=>{
   setTimeout(applyMobileTitleTruncate, 0);
+});
+
+
+
+// v22: re-apply title truncation whenever title changes (e.g., switching threads)
+document.addEventListener("DOMContentLoaded", ()=>{
+  const el = document.getElementById("threadTitle");
+  if(!el || !window.MutationObserver) return;
+  let t = null;
+  const obs = new MutationObserver(()=>{
+    if(t) clearTimeout(t);
+    t = setTimeout(()=>{
+      // If some code replaced the title text without updating data-full-title,
+      // treat current text as the new full title first.
+      const cur = el.textContent || "";
+      const stored = el.getAttribute("data-full-title");
+      if(!stored || stored === "" || stored === el.textContent){
+        // Only overwrite when it looks like "full title" was replaced.
+        // If we're currently showing a truncated title, keep stored.
+        const looksTruncated = cur.endsWith("…") && (stored && stored.length > cur.length);
+        if(!looksTruncated) el.setAttribute("data-full-title", cur);
+      }
+      applyMobileTitleTruncate();
+    }, 0);
+  });
+  obs.observe(el, { characterData: true, childList: true, subtree: true });
+  // initial
+  applyMobileTitleTruncate();
 });
