@@ -171,7 +171,7 @@ function exportThreadMarkdown(t){
     const who = (m.role === "user") ? "ユーザー" : "ワイテッくん";
     lines.push(`## ${who}`);
     lines.push(m.content || "");
-    if (Array.isArray(m.sources) && m.sources.length) {
+    if ((Array.isArray(m.sources) && m.sources.length) || (Array.isArray(m.wiki_sources) && m.wiki_sources.length) || (Array.isArray(m.web_sources) && m.web_sources.length)) {
       lines.push("");
       lines.push("### 参照（ナレッジからの事例）");
       for (const s of m.sources) {
@@ -421,7 +421,8 @@ function renderChat() {
 
       const summary = document.createElement("summary");
       summary.className = "refs-summary";
-      summary.textContent = `参照（${m.sources.length}件）`;
+      const refCount = (Array.isArray(m.sources) ? m.sources.length : 0) + (Array.isArray(m.wiki_sources) ? m.wiki_sources.length : 0) + (Array.isArray(m.web_sources) ? m.web_sources.length : 0);
+      summary.textContent = `参照（${refCount}件）`;
       details.appendChild(summary);
 
       const body = document.createElement("div");
@@ -444,8 +445,55 @@ function renderChat() {
       list1.innerHTML = items || "（なし）";
       sec1.appendChild(list1);
 
-      // Placeholders for future layers (Wiki / Trusted sites) – we'll add in ⑤
       body.appendChild(sec1);
+
+      // Layer 2: Wiki (internal)
+      const wikiArr = Array.isArray(m.wiki_sources) ? m.wiki_sources : null;
+      if (wikiArr && wikiArr.length) {
+        const sec2 = document.createElement("div");
+        sec2.className = "refs-section";
+        const q = m.wiki_used_query ? `（query: ${escapeHtml(m.wiki_used_query)}）` : "";
+        sec2.innerHTML = `<div class="refs-head">Wiki内該当情報 ${q}</div>`;
+
+        const list2 = document.createElement("div");
+        list2.className = "refs-list";
+        const items2 = wikiArr.map(s => {
+          const title = s.title || s.url || "（無題）";
+          const url = s.url || "";
+          const score = (s.score === null || s.score === undefined) ? "" : `（score ${Number(s.score).toFixed(1)}）`;
+          return url
+            ? `・<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a> ${escapeHtml(score)}`
+            : `・${escapeHtml(title)} ${escapeHtml(score)}`;
+        }).join("<br>");
+        list2.innerHTML = items2 || "（なし）";
+        sec2.appendChild(list2);
+        body.appendChild(sec2);
+      }
+
+      // Layer 3: Trusted technical sites (external)
+      const webArr = Array.isArray(m.web_sources) ? m.web_sources : null;
+      if (webArr && webArr.length) {
+        const sec3 = document.createElement("div");
+        sec3.className = "refs-section";
+        const q = m.web_used_query ? `（query: ${escapeHtml(m.web_used_query)}）` : "";
+        sec3.innerHTML = `<div class="refs-head">技術系サイト情報 ${q}</div>`;
+
+        const list3 = document.createElement("div");
+        list3.className = "refs-list";
+        const items3 = webArr.map(s => {
+          const title = s.title || s.url || "（無題）";
+          const url = s.url || "";
+          const from = s.from ? `（from ${escapeHtml(s.from)}）` : "";
+          const snip = s.snippet ? `：${escapeHtml(s.snippet)}` : "";
+          const score = (s.score === null || s.score === undefined) ? "" : `（score ${Number(s.score).toFixed(1)}）`;
+          return url
+            ? `・<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a> ${from} ${snip} ${escapeHtml(score)}`
+            : `・${escapeHtml(title)} ${from} ${snip} ${escapeHtml(score)}`;
+        }).join("<br>");
+        list3.innerHTML = items3 || "（なし）";
+        sec3.appendChild(list3);
+        body.appendChild(sec3);
+      }
 
       details.appendChild(body);
       wrap.appendChild(details);
@@ -487,10 +535,28 @@ function ensureActiveThread() {
   return getActiveThread();
 }
 
-function addMessage(role, content, sources) {
+function addMessage(role, content, refs) {
   const t = ensureActiveThread();
   t.messages = t.messages || [];
-  t.messages.push({ role, content, sources: sources || null });
+
+  const msg = { role, content };
+
+  // Backward compatible:
+  // - older callers pass an array as "refs" (knowledge sources only)
+  // - newer callers pass { sources, wiki_sources, web_sources, wiki_used_query, web_used_query }
+  if (Array.isArray(refs)) {
+    msg.sources = refs.length ? refs : null;
+  } else if (refs && typeof refs === "object") {
+    msg.sources = Array.isArray(refs.sources) && refs.sources.length ? refs.sources : null;
+    msg.wiki_sources = Array.isArray(refs.wiki_sources) && refs.wiki_sources.length ? refs.wiki_sources : null;
+    msg.web_sources = Array.isArray(refs.web_sources) && refs.web_sources.length ? refs.web_sources : null;
+    msg.wiki_used_query = refs.wiki_used_query || null;
+    msg.web_used_query = refs.web_used_query || null;
+  } else {
+    msg.sources = null;
+  }
+
+  t.messages.push(msg);
   t.updatedAt = nowIso();
 
   // title heuristic: first user message becomes full title
@@ -576,7 +642,7 @@ async function resendPayload(payload) {
     clearRetry();
 
     // add assistant response
-    addMessage("assistant", data.reply || "（応答が空です）", data.sources || null);
+    addMessage("assistant", data.reply || "（応答が空です）", { sources: data.sources || null, wiki_sources: data.wiki_sources || null, wiki_used_query: data.wiki_used_query || null, web_sources: data.web_sources || null, web_used_query: data.web_used_query || null });
   } catch (e) {
     if (e?.name === "AbortError") {
       // ignore
@@ -626,7 +692,7 @@ async function sendMessage() {
     const data = await callApi(text, t.id, history);
     setStatus("");
     // add assistant response
-    addMessage("assistant", data.reply || "（応答が空です）", data.sources || null);
+    addMessage("assistant", data.reply || "（応答が空です）", { sources: data.sources || null, wiki_sources: data.wiki_sources || null, wiki_used_query: data.wiki_used_query || null, web_sources: data.web_sources || null, web_used_query: data.web_used_query || null });
   } catch (e) {
     if (e?.name === "AbortError") {
       // ignore
@@ -756,6 +822,10 @@ function normalizeMessage(m){
   const msg = { role, content: String(content) };
   if (m.time) msg.time = m.time;
   if (Array.isArray(m.sources)) msg.sources = m.sources;
+  if (Array.isArray(m.wiki_sources)) msg.wiki_sources = m.wiki_sources;
+  if (Array.isArray(m.web_sources)) msg.web_sources = m.web_sources;
+  if (m.wiki_used_query) msg.wiki_used_query = m.wiki_used_query;
+  if (m.web_used_query) msg.web_used_query = m.web_used_query;
   return msg;
 }
 
